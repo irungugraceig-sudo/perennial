@@ -1,0 +1,60 @@
+:root {
+  --ink: #0f1b2d;
+  --frost: #2a7bff;
+  --bg: #f4f8fd;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.layout { display: grid; grid-template-columns: 400px 1fr; height: 100vh; }
+
+.panel { padding: 20px 22px; overflow-y: auto; background: #fff; border-right: 1px solid #e2e8f0; }
+
+h1 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+.tagline { margin: 4px 0 16px; color: #51637a; font-size: 14px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #7187a3; margin: 20px 0 10px; }
+
+.field { display: block; margin: 8px 0 14px; font-size: 13px; }
+.field span { display: block; margin-bottom: 4px; color: #33465e; }
+.field select { width: 100%; padding: 8px; border: 1px solid #d3deea; border-radius: 8px; font-size: 13px; background: #fff; }
+
+.tabs { display: flex; gap: 6px; margin: 6px 0 4px; }
+.tabs button { flex: 1; padding: 8px; border: 1px solid #d3deea; background: #f7fafe; border-radius: 8px; cursor: pointer; font-size: 13px; color: #33465e; }
+.tabs button.on { background: var(--frost); color: #fff; border-color: var(--frost); }
+
+.slider { display: block; margin: 12px 0; font-size: 13px; }
+.slider span { display: block; margin-bottom: 4px; color: #33465e; }
+.slider input { width: 100%; accent-color: var(--frost); }
+
+.verdict { background: #eaf2ff; border: 1px solid #c7ddff; color: #1b4fb3; padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { background: #f7fafe; border: 1px solid #e6eefb; border-radius: 8px; padding: 12px; }
+.stat-value { font-size: 20px; font-weight: 700; color: var(--frost); }
+.stat-label { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+.fine { font-size: 11px; color: #7a8aa0; margin-top: 10px; line-height: 1.5; }
+.error { color: #d7263d; font-size: 13px; }
+
+.periods { list-style: none; padding: 0; margin: 10px 0; }
+.periods li { padding: 8px 10px; border: 1px solid #eef3fa; border-radius: 8px; margin-bottom: 6px; font-size: 13px; }
+
+.ranked { list-style: none; padding: 0; margin: 10px 0; counter-reset: rank; }
+.ranked li { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-bottom: 1px solid #eef3fa; font-size: 14px; }
+.badge { color: #fff; font-weight: 700; font-size: 12px; min-width: 30px; text-align: center; padding: 3px 6px; border-radius: 6px; }
+
+.map-wrap { position: relative; }
+.map { position: absolute; inset: 0; }
+
+/* markers */
+.dc-marker { width: 16px; height: 16px; background: #d7263d; border: 2px solid #fff; border-radius: 3px; box-shadow: 0 0 0 1px #d7263d; cursor: pointer; }
+.dc-marker.selected { width: 20px; height: 20px; box-shadow: 0 0 0 3px rgba(215,38,61,0.35); }
+.pile-marker { background: rgba(42,123,255,0.6); border: 2px solid #1b4fb3; border-radius: 50%; cursor: pointer; }
+.hot-marker { width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }

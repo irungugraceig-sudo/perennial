@@ -34,7 +34,7 @@ fraction = st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infini
 @given(snowfall=nonneg, eff=fraction, density=positive)
 def test_collected_mass_non_negative(snowfall, eff, density):
     mass = collected_mass_geometric(
-        CollectionInputs(snowfall_m=snowfall, collection_efficiency=eff, snow_density=density)
+        CollectionInputs(snowfall_m=snowfall, collection_efficiency=eff, fresh_snow_density=density)
     )
     assert mass >= 0.0
 
@@ -48,10 +48,10 @@ def test_collected_mass_non_negative(snowfall, eff, density):
 def test_more_snow_never_less_mass(snowfall, extra, eff, density):
     """Monotonic: more snowfall => at least as much collected mass."""
     base = collected_mass_geometric(
-        CollectionInputs(snowfall_m=snowfall, collection_efficiency=eff, snow_density=density)
+        CollectionInputs(snowfall_m=snowfall, collection_efficiency=eff, fresh_snow_density=density)
     )
     more = collected_mass_geometric(
-        CollectionInputs(snowfall_m=snowfall + extra, collection_efficiency=eff, snow_density=density)
+        CollectionInputs(snowfall_m=snowfall + extra, collection_efficiency=eff, fresh_snow_density=density)
     )
     assert more >= base - 1e-6
 
@@ -67,13 +67,13 @@ def test_collection_linear_in_area(snowfall, eff, density, width):
     single = collected_mass_geometric(
         CollectionInputs(
             snowfall_m=snowfall, collection_efficiency=eff,
-            snow_density=density, effective_lane_width_m=width,
+            fresh_snow_density=density, effective_lane_width_m=width,
         )
     )
     double = collected_mass_geometric(
         CollectionInputs(
             snowfall_m=snowfall, collection_efficiency=eff,
-            snow_density=density, effective_lane_width_m=width * 2,
+            fresh_snow_density=density, effective_lane_width_m=width * 2,
         )
     )
     assert math.isclose(double, single * 2, rel_tol=1e-6)

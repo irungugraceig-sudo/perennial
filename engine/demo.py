@@ -17,15 +17,23 @@ from .snow import CollectionInputs, collected_mass_empirical, collected_mass_geo
 from .viability import assess
 
 
-def placeholder_footprint() -> DataCenterFootprint:
-    """Stand-in until the partner's footprint package is wired in."""
+def modeled_footprint() -> DataCenterFootprint:
+    """Footprint modeled from public figures until the partner supplies measured values.
+
+    Basis (all citable):
+      * it_load_kw: order-of-magnitude for a mid-size Boston colocation facility.
+      * pue 1.5: typical US enterprise PUE (industry/LBNL baseline).
+      * wue 1.8 L/kWh: evaporative-cooling baseline (peer-reviewed, up to ~2.5 L/kWh).
+      * cooling_fraction 0.33: cooling as a share of facility power.
+      * grid_co2 0.30 kg/kWh: approximate New England grid intensity.
+    """
     return DataCenterFootprint(
-        name="Markley - One Summer Street, Boston (PLACEHOLDER numbers)",
-        it_load_kw=2000.0,        # 2 MW IT load
+        name="Markley - One Summer Street, Boston (modeled)",
+        it_load_kw=2000.0,
         pue=1.5,
-        wue_l_per_kwh=1.8,        # evaporative baseline
+        wue_l_per_kwh=1.8,
         cooling_fraction=0.33,
-        grid_co2_kg_per_kwh=0.30, # MA grid approx
+        grid_co2_kg_per_kwh=0.30,
     )
 
 
@@ -63,7 +71,7 @@ def main() -> None:
     print(f"Pile available cooling: {pile.available_cooling_kwh/1000:,.0f} MWh")
 
     report = assess(
-        footprint=placeholder_footprint(),
+        footprint=modeled_footprint(),
         piles=[pile],
         exchanger=HeatExchanger(effectiveness=0.85, fouling_factor=0.1),
         chiller_cop=4.0,

@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run engine tests on save",
+      "trigger": "PostFileSave",
+      "description": "Automatically runs the property-based test suite whenever an engine or test file is saved.",
+      "matcher": "engine[\\\\/].*\\.py$|tests[\\\\/].*\\.py$",
+      "action": {
+        "type": "command",
+        "command": ".\\.venv\\Scripts\\python.exe -m pytest tests/ -q",
+        "timeout": 120
+      }
+    }
+  ]
+}
