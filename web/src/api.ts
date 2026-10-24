@@ -26,9 +26,19 @@ export interface DataCenter {
   grid_co2_kg_per_kwh: number;
 }
 
+export interface MonthPoint {
+  month: number;
+  demand_mwh: number;
+  snow_mwh: number;
+  pile_tonnes: number;
+  offset_pct: number;
+}
+
 export interface AssessResult {
   site: string;
   datacenter_coords: { lat: number; lon: number };
+  peak_month_offset_pct: number;
+  season: MonthPoint[];
   collected_tonnes_geometric: number;
   collected_tonnes_empirical: number;
   annual_cooling_demand_mwh: number;
@@ -45,6 +55,7 @@ export interface AssessInputs {
   datacenter?: string;
   snowfall_m: number;
   collection_efficiency: number;
+  storms_per_season: number;
   passive_loss_fraction: number;
   hx_effectiveness: number;
   hx_fouling_factor: number;

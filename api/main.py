@@ -18,6 +18,7 @@ from engine.hotspots import Candidate, ScoreWeights, score_candidate
 from engine.interfaces import DataCenterFootprint
 from engine.noaa import fetch_seasonal_snowfall
 from engine.piles import SnowPile
+from engine.seasonal import build_season
 from engine.sites import BOSTON_SNOW_FARMS
 from engine.snow import CollectionInputs, collected_mass_empirical, collected_mass_geometric
 from engine.terrain import fetch_terrain
@@ -224,9 +225,25 @@ def do_assess(body: AssessIn):
         chiller_cop=body.chiller_cop,
     )
 
+    # Seasonal model for the peak-shaving story + timeline slider.
+    season = build_season(
+        annual_demand_kwh=report.annual_cooling_demand_kwh,
+        collected_mass_kg=mass_geo,
+        passive_loss_fraction=body.passive_loss_fraction,
+        delivery_ratio=body.hx_effectiveness * (1.0 - body.hx_fouling_factor),
+    )
+
     return {
         "site": report.footprint_name,
         "datacenter_coords": dc_coords,
+        "peak_month_offset_pct": season.peak_month_offset_pct,
+        "season": [
+            {"month": p.month, "demand_mwh": round(p.demand_kwh / 1000, 1),
+             "snow_mwh": round(p.snow_supply_kwh / 1000, 1),
+             "pile_tonnes": round(p.pile_mass_tonnes, 0),
+             "offset_pct": p.offset_pct}
+            for p in season.months
+        ],
         "collected_tonnes_geometric": round(mass_geo / 1000, 0),
         "collected_tonnes_empirical": round(mass_emp / 1000, 0),
         "annual_cooling_demand_mwh": round(report.annual_cooling_demand_kwh / 1000, 0),

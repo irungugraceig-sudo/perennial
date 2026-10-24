@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import MapView from "./MapView";
+import SeasonChart from "./SeasonChart";
 import {
   assess, getDataCenters, getForecast, getHotspots,
   type AssessInputs, type AssessResult, type DataCenter,
@@ -7,8 +8,9 @@ import {
 } from "./api";
 
 const DEFAULTS: AssessInputs = {
-  snowfall_m: 2.809,
-  collection_efficiency: 0.15,
+  snowfall_m: 1.1,          // a typical Boston winter (honest default, not the record)
+  collection_efficiency: 0.12,
+  storms_per_season: 3,
   passive_loss_fraction: 0.25,
   hx_effectiveness: 0.85,
   hx_fouling_factor: 0.1,
@@ -48,10 +50,18 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 type Tab = "calc" | "forecast" | "hotspots";
 
+function monthName(m: number) {
+  return [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ][m - 1];
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("calc");
   const [dcs, setDcs] = useState<DataCenter[]>([]);
   const [selected, setSelected] = useState<string>("");
+  const [month, setMonth] = useState<number>(7); // July = peak
   const [inputs, setInputs] = useState<AssessInputs>(DEFAULTS);
   const [result, setResult] = useState<AssessResult | null>(null);
   const [forecast, setForecast] = useState<Forecast | null>(null);
@@ -128,6 +138,7 @@ export default function App() {
             <h2>Scenario</h2>
             <Slider label="Seasonal snowfall" value={inputs.snowfall_m} min={0.2} max={3.5} step={0.1} suffix=" m" onChange={set("snowfall_m")} />
             <Slider label="Collection efficiency" value={inputs.collection_efficiency} min={0.02} max={1} step={0.01} onChange={set("collection_efficiency")} />
+            <Slider label="Major storms / season" value={inputs.storms_per_season} min={1} max={12} step={1} onChange={set("storms_per_season")} />
             <Slider label="Pile melt loss" value={inputs.passive_loss_fraction} min={0} max={0.6} step={0.05} onChange={set("passive_loss_fraction")} />
             <Slider label="Heat-exchanger effectiveness" value={inputs.hx_effectiveness} min={0.5} max={1} step={0.05} onChange={set("hx_effectiveness")} />
             <Slider label="Exchanger fouling" value={inputs.hx_fouling_factor} min={0} max={0.5} step={0.05} onChange={set("hx_fouling_factor")} />
@@ -135,20 +146,32 @@ export default function App() {
 
             {result && (
               <>
-                <h2>Offset</h2>
-                <div className="verdict">{result.verdict}</div>
+                <h2>Summer peak shaving</h2>
+                <div className="verdict">
+                  At the <b>July/August peak</b> — when cooling towers drink the most water and
+                  the grid is most stressed — stored snow covers <b>{result.peak_month_offset_pct}%</b> of cooling demand.
+                </div>
+
+                <SeasonChart season={result.season} selectedMonth={month} />
+                <label className="slider">
+                  <span>Month: <b>{monthName(month)}</b></span>
+                  <input type="range" min={1} max={12} step={1} value={month}
+                    onChange={(e) => setMonth(parseInt(e.target.value))} />
+                </label>
+
+                <h2>Annual savings</h2>
                 <div className="stats">
-                  <Stat label="of cooling demand offset" value={`${result.fraction_offset_pct}%`} />
                   <Stat label="gal fresh water saved/yr" value={result.fresh_water_saved_gallons.toLocaleString()} />
+                  <Stat label="≈ Olympic pools" value={(result.fresh_water_saved_gallons / 660000).toFixed(1)} />
                   <Stat label="MWh chiller energy avoided" value={result.chiller_energy_avoided_mwh.toLocaleString()} />
                   <Stat label="tonnes CO2 avoided/yr" value={result.co2_avoided_tonnes.toLocaleString()} />
                 </div>
                 <p className="fine">
-                  Collected (geometric): {result.collected_tonnes_geometric.toLocaleString()} t ·
-                  (empirical): {result.collected_tonnes_empirical.toLocaleString()} t ·
-                  demand {result.annual_cooling_demand_mwh.toLocaleString()} MWh/yr.
+                  Collected snow (geometric): {result.collected_tonnes_geometric.toLocaleString()} t ·
+                  cross-check (empirical, from Boston's ~89k yd³/storm hauled): {result.collected_tonnes_empirical.toLocaleString()} t.
+                  Annual cooling demand {result.annual_cooling_demand_mwh.toLocaleString()} MWh.
                 </p>
-                <p className="fine">Snowfall from NOAA GHCN-Daily. Offset is modeled and seasonal — a fraction of annual demand.</p>
+                <p className="fine">Snowfall: NOAA GHCN-Daily. Modeled, seasonal estimate — snow shaves the peak, it does not replace year-round cooling.</p>
               </>
             )}
           </>
