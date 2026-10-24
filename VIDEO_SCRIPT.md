@@ -1,76 +1,60 @@
 # Perennial — 3-Minute Demo Video Script
 
-Target: under 3:00. Times are cumulative. Keep footage of the app running on screen.
-Record narration separately if easier, then lay it over the screen capture.
+Target under 3:00. Record screen with OBS / Windows Game Bar (Win+G) / Loom, narrate over it,
+upload to YouTube (public). Live app: https://perennial-murex.vercel.app
+
+Tip: do a dry run first and pick a snowy date (2015-02-10) before recording so no screen shows "0 mm".
 
 ---
 
-## 0:00–0:25 — The hook (open on the 2015 Boston snow farm)
-**Visual:** A photo of the 2015 Seaport snow pile (use a public-domain / city-sourced image, or a
-title card citing it). Then cut to the Perennial app.
+## 0:00–0:20 — Hook (hero + the problem)
+**Screen:** The Perennial landing page (logo + "Winter's cold, kept for summer").
+**Say:** "In 2015, Boston plowed a record winter into a 75-foot mountain of snow that didn't melt
+until July. That cold was wasted. Meanwhile, AI data centers drank 17 billion gallons of fresh
+water last year just to stay cool. Perennial connects those two problems."
 
-**Narration:**
-"In 2015, Boston plowed a record winter into a 75-foot mountain of snow. It didn't melt until
-mid-July. That cold sat in a parking lot, wasted. Meanwhile, AI data centers drank 17 billion
-gallons of fresh water last year just to stay cool. Perennial connects those two problems."
+## 0:20–0:45 — The idea (City view)
+**Screen:** Click "I'm a City." Show the snow-farm map and pick the 2015 blizzard date (25.3 in).
+**Say:** "Cities already pile snow that survives into summer. Perennial tracks that supply, real
+NOAA snowfall for any date you pick, and the date you choose feeds the calculator directly."
 
-## 0:25–0:50 — The problem + the thesis
-**Visual:** Calculator tab, data-center dropdown showing Markley One Summer Street.
+## 0:45–1:25 — The hero: peak shaving (Calculator)
+**Screen:** Go to Calculator. Drag the month slider Jan→Aug. Show the chart (demand rising, snow
+coverage), then the savings stats (water, CO₂), then the water→carbon chain.
+**Say:** "Here's the clever part: collect cold in winter, spend it in summer. Watch the pile build,
+then shave the July-August peak, when cooling towers drink the most. For a typical Boston winter,
+stored snow covers over 70% of peak-month cooling. And this chain shows how the same cold saves
+BOTH fresh water and the chiller electricity, which is where the carbon saving comes from."
 
-**Narration:**
-"Data centers reject heat by evaporating fresh water in cooling towers — an open loop that drinks
-the most on the hottest summer weeks. Perennial moves that to a closed loop: it borrows winter's
-cold from stored snow through a shell-and-tube heat exchanger. The dirty snow and the clean coolant
-never mix — only heat crosses."
+## 1:25–1:55 — Show your work + the AI (Calculator)
+**Screen:** Click "Show the math" (step-by-step derivation). Then open "✦ Ask AI" and type
+"what if we double collection efficiency?" — show the AI changing the input and the numbers update.
+**Say:** "Every number is auditable, step by step, from NOAA snowfall to CO₂. And the built-in
+Claude assistant can run what-ifs for you, it changes the inputs and the whole model updates live."
 
-## 0:50–1:30 — The hero: peak shaving (the season chart + slider)
-**Visual:** Drag the month slider from January to August. Pile fills in winter, demand curve rises
-into July/August, blue snow-coverage tracks it.
+## 1:55–2:20 — The business case (Dashboard)
+**Screen:** Go to Dashboard. Show the KPI cards and carbon-credit value, then the PDF download.
+**Say:** "Boston spends 47 million dollars a year getting rid of snow. Perennial lets the city sell
+that cold instead, and gives each GPU data center a carbon-negative cooling source it can report
+toward its 2030 water and carbon goals, as a one-page PDF."
 
-**Narration:**
-"Here's the idea that makes it work: you collect cold in winter, when you don't need it, and spend
-it in summer, when demand peaks. Watch the pile build through winter — then shrink as it shaves the
-July and August peak, exactly when cooling towers drink the most and the grid is most stressed.
-For a typical Boston winter, stored snow covers over 70% of peak-month cooling demand."
+## 2:20–2:45 — The engineering + Kiro (Logic)
+**Screen:** Go to Logic. Show the shell-and-tube cooler schematic and the formulas.
+**Say:** "The cooler is a real shell-and-tube design, dirty snow and clean coolant never mix. We
+built Perennial spec-first in Kiro: steering docs kept every number sourced, a custom MCP server
+pulled live NOAA, NWS, and USGS data, and property-based tests caught a 24-times error our eyes
+missed."
 
-## 1:30–2:00 — Real data, honest numbers
-**Visual:** Scroll to the stats — water saved, Olympic pools, CO2 — and the geometric-vs-empirical
-cross-check line. Briefly show the Forecast and Hotspots tabs.
-
-**Narration:**
-"Every number is real and sourced. Snowfall comes from NOAA; the forecast from the National Weather
-Service; terrain for siting from USGS. We estimate collected snow two independent ways and show both
-side by side — because snow cooling is seasonal and finite, and we report the fraction of demand it
-offsets, never a magic 100%."
-
-## 2:00–2:30 — Who wins (the business + equity case)
-**Visual:** Map with the data center and snow piles; EJ overlay if built.
-
-**Narration:**
-"Boston already spends about 47 million dollars a year moving snow it treats as waste — it even
-considered machines to melt it down the sewer. Perennial turns that cost into cold-as-a-service: the
-city sells delivered cold, the data center cuts its freshwater footprint, and the contaminated
-meltwater is captured in one managed place instead of running off every street into the harbor."
-
-## 2:30–3:00 — Built with Kiro + the scale beat
-**Visual:** Quick cuts: the spec files, steering docs, the MCP server tools, the passing
-property-based tests, a hook firing.
-
-**Narration:**
-"We built Perennial spec-first in Kiro. Steering docs kept every number sourced and in SI units.
-A custom MCP server let Kiro pull NOAA, NWS, and USGS data directly. Property-based tests caught a
-24-times estimate error our eyes missed. The same snow problem exists in Montreal, Minneapolis,
-Buffalo, and Hokkaido — where a snow-cooled data center already runs. Perennial is how cold cities
-turn winter into a climate asset. Thank you."
+## 2:45–3:00 — Close (scale)
+**Screen:** Back to the map or hero.
+**Say:** "Montreal, Minneapolis, Buffalo, Hokkaido, every cold city has this same wasted asset.
+Perennial turns winter into a climate resource, exactly where AI is growing fastest. Thank you."
 
 ---
 
-## Shot list / checklist
-- [ ] 2015 snow-farm image with on-screen citation (rights-cleared).
-- [ ] Screen capture: month slider sweep Jan->Aug (the money shot).
-- [ ] Screen capture: stats + cross-check line.
-- [ ] Screen capture: Forecast tab, Hotspots tab, map.
-- [ ] Screen capture: .kiro/specs, .kiro/steering, mcp_server, pytest run, a hook firing.
-- [ ] No copyrighted music. Use silence or a royalty-free/CC0 track with attribution.
-- [ ] Upload PUBLIC to YouTube/Vimeo; put the link on the submission form.
-- [ ] Keep it UNDER 3:00 — judges may stop at exactly 3:00.
+## Checklist
+- [ ] Pre-set a snowy date so no "0 mm" shows on camera.
+- [ ] Confirm the AI assistant is live (set ANTHROPIC_API_KEY on Vercel) OR demo the scripted guide.
+- [ ] Show: hero, City (date→snowfall), Calculator (slider + math + AI), Dashboard (PDF), Logic (schematic).
+- [ ] No copyrighted music. Keep under 3:00.
+- [ ] Upload PUBLIC to YouTube; put the link on the submission form.
