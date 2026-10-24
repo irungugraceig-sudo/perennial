@@ -122,6 +122,22 @@ Judges reward using unique public datasets. Use the portal's own data where poss
   snowfall from NOAA (NWS/NCEI) through an MCP server. Doubles as the MCP write-up story.
 - Citation rule: cite the agency/program for every dataset; link official pages, don't rehost.
 
+### Datasets by layer (confirmed)
+**City / logistics (Boston):**
+- Boston Snow Removal Dashboard (city Analytics Team): https://www.boston.gov/departments/analytics-team/snow-removal-dashboard
+- 311 Service Requests (residents report snow issues): https://data.boston.gov/dataset/ (search "311 Service Requests")
+- BERDO building energy + GHG, Electric-utility-by-town, Renewables-at-landfills, EJ block groups (URLs above).
+
+**Data center (grounds):**
+- Markley One Summer Street, Boston (~99,189 sq ft). No public live telemetry => model cooling
+  load from floor area + industry PUE / water-use figures (LBNL/DOE). Standard & defensible.
+
+**Weather / snow:**
+- NOAA GHCN-Daily: historical daily SNOWFALL + SNOW DEPTH per station. Boston Logan =
+  GHCND:USW00014739. https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:USW00014739/detail
+- NOAA Climate Normals (30-yr monthly): siting + months-of-offset (URLs above).
+- Easy programmatic access via ACIS API (as used by bostonweatherdata.com).
+
 ## Platform = Three Layers
 Thesis: **move data-center cooling from an OPEN loop (bleeds fresh water via evaporative towers)
 to a CLOSED loop (borrows winter's cold from stored snow). The meltwater is spent coolant, not
@@ -181,6 +197,83 @@ consumed product.**
 - US DC direct water: ~17B gal (2023) -> LBNL projects 38-73B gal by 2028; hyperscale alone
   16-33B gal/yr by 2028 (DOE/LBNL via Forbes).
 - Global DC capacity demand ~22% CAGR; generative-AI workloads alone ~39% CAGR (industry analysis).
+
+## How Data Centers Use Water (model inputs)
+Metric: **WUE = liters water consumed / kWh IT energy** (The Green Grid, 2011). Water analog of PUE.
+Perennial uses WUE to turn a DC's energy into water consumed.
+
+Cooling methods & water:
+1. **Evaporative cooling / cooling towers** — dominant method, biggest waster. Water EVAPORATES
+   (gone forever). **This is what Perennial replaces.** WUE up to ~2.5 L/kWh.
+2. **Water-cooled chillers** — refrigeration + cooling tower; uses electricity AND water.
+3. **Air-cooled / dry cooling** — ~0 water but MORE electricity (worse PUE, more off-site water).
+4. **Direct liquid / immersion cooling** — great for hot AI/GPU racks; heat still rejected via
+   tower or chiller. Closed-loop dry ~= 0 L/kWh.
+5. **Free / ambient cooling** — use cold outside air/water directly; only works when it's cold.
+   Perennial = "stored free cooling for when it's NOT cold out."
+
+Cooling-tower water leaves three ways: **evaporation** (main), **blowdown** (mineral drain),
+**makeup** (replaces both). Heat path: servers -> chilled-water loop -> chiller -> condenser loop
+-> tower -> atmosphere.
+
+Benchmarks: evaporative ~up to 2.5 L/kWh; dry/closed-loop ~0 L/kWh; Climate Neutral DC Pact
+target ~0.4 L/kWh for new builds.
+
+**The honest tradeoff (judges may probe):** evaporative uses MORE water but SAVES electricity vs.
+dry cooling (which trades water for carbon). **Perennial's edge: melting snow rejects heat with
+NO evaporation AND NO chiller electricity** (cold is free) — beats evaporative on water and dry on
+energy, for the fraction of the year stored cold lasts.
+
+Two footprints: **on-site/direct** (tower evaporation) + **off-site/indirect** (water used by
+power plants for the DC's electricity). Perennial cuts both.
+
+## Contamination & the Heat-Exchanger Design (engineering realism)
+Worry: plowed city snow is filthy (road salt, sand, oil, grit, debris) — won't it contaminate the
+data center's ultrapure coolant? **No — the two never touch.** The system is TWO separate circuits
+joined only by a sealed metal wall that passes heat, not fluid.
+
+- **Clean side (closed loop):** ultrapure coolant <-> servers <-> heat exchanger. Sealed, never
+  exposed to air or snow, stays pure forever.
+- **Dirty side (open loop):** melting snow -> heat exchanger -> drain. Can be as dirty as it wants.
+- Only HEAT crosses the barrier (like a car radiator / fridge coils). No salt/oil/dirt transfers.
+
+**Chosen hardware: shell-and-tube heat exchanger.**
+- Ultrapure coolant flows INSIDE the tubes (protected). Dirty snow meltwater flows through the
+  SHELL around the tubes. Heat crosses the tube walls; fluids never mix.
+- Why it fits: built to handle dirty, particle-laden fluid on the shell side; robust and cleanable
+  (pull tube bundles when fouled); handles large thermal loads; off-the-shelf industrial kit.
+- **Account for FOULING:** salt/sediment/biofilm foul the shell side over time, lowering heat
+  transfer. Model a fouling factor + periodic cleaning (standard practice) => credible, not naive.
+
+Bonus environmental win: the contaminated meltwater is CAPTURED and managed in one place (can be
+treated before storm drains) instead of uncontrolled salty/oily street runoff into the harbor.
+
+Modeling notes:
+- Road salt lowers snow's melting point below 0 C -> small cooling "quality"/latent-heat penalty.
+- The cold is the asset; the snow's dirtiness is irrelevant to the coolant.
+
+## Estimating COLLECTED Snow (not just snowfall)
+Two different numbers — do NOT conflate:
+- **Snowfall** (what falls): NOAA GHCN-Daily, per area. Known.
+- **Collected snow** (what gets plowed + hauled to a farm): always LESS than what fell. This is the
+  real input to cooling. Expose collection-efficiency as an ADJUSTABLE SLIDER, not a hidden constant.
+
+Real Boston numbers (citable):
+- Boston Public Works plows/salts **785 miles of city streets**; contractors haul snow to **11
+  disposal "snow farm" sites**. [FEMA node/646499]
+- One storm: city cleared **~89,000 cubic yards** of snow trucked to the snow farms. [Berkeley Beacon]
+- Boston budgets **~$47M/year** for snow & winter ops. [boston.gov FY budget doc] <- "cities spend
+  millions," verified + local.
+- Boston considered buying **snow melters** (dump snow in hot water -> sewer). Perennial is the
+  opposite: harvest the cold instead of spending ENERGY to destroy it. [boston.gov Flynn hearing order]
+  Strong pitch contrast.
+
+Engine estimates collected snow TWO ways and cross-checks:
+- **Method A (geometric):** snowfall depth x plowed street area (785 mi x lane width) x
+  collection-efficiency factor x snow density -> water-equiv mass -> cooling (334 kJ/kg).
+- **Method B (empirical):** anchor to ~89,000 cu yd/major storm x storms per season.
+- Showing both land in the same ballpark = rigor judges reward; keeps the collection-efficiency
+  assumption honest and visible.
 
 ## Verified Facts for the Pitch (safe to say on camera)
 - US data centers used ~17 billion gallons of water directly for cooling in 2023 (LBNL / DOE).
