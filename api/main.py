@@ -16,10 +16,12 @@ from engine.datacenters import DATA_CENTERS, by_name
 from engine.forecast import fetch_snow_forecast
 from engine.hotspots import Candidate, ScoreWeights, score_candidate
 from engine.interfaces import DataCenterFootprint
-from engine.noaa import fetch_seasonal_snowfall
+from engine.metrics import ICE_KG_PER_LITER_WATER, compute_dashboard
+from engine.noaa import BOSTON_LOGAN_GHCND, fetch_seasonal_snowfall
 from engine.piles import SnowPile
+from engine.predictor import get_predictor, season_total_water_equivalent_m
 from engine.projection import plan_expansion, project_impact
-from engine.seasonal import build_season
+from engine.seasonal import COLLECTION_MONTHS, build_season
 from engine.sites import BOSTON_SNOW_FARMS
 from engine.snow import CollectionInputs, collected_mass_empirical, collected_mass_geometric
 from engine.terrain import fetch_terrain
@@ -49,6 +51,11 @@ class AssessIn(BaseModel):
     datacenter: str | None = None          # name from /datacenters; overrides footprint if set
     footprint: FootprintIn = Field(default_factory=FootprintIn)
     snowfall_m: float = 2.809              # default: 2014-15 Boston record
+    # If set, derive snowfall_m from the ML predictor instead of the fixed value
+    # above. This answers "how much can we EXPECT next winter" rather than
+    # replaying one historical season.
+    use_prediction: bool = False
+    predict_station: str = BOSTON_LOGAN_GHCND
     collection_efficiency: float = 0.12
     effective_lane_width_m: float = 11.0
     storms_per_season: float = 6.0
@@ -254,6 +261,91 @@ def snowfall(start: str, end: str, station: str = "USW00014739"):
     }
 
 
+@app.get("/predict-snowfall")
+def predict_snowfall(station: str = BOSTON_LOGAN_GHCND):
+    """ML-predicted monthly snowfall for a station, as an expected +/- band.
+
+    Answers the planning question ("how much snow can we expect this winter")
+    that observed history (/snowfall) and the 7-day forecast (/forecast) cannot.
+    Depths in meters; also returns the season-total water-equivalent depth over
+    the collection months, which /assess can consume with use_prediction=true.
+    """
+    predictor = get_predictor()
+    year = predictor.predict_year(station)
+    season_we_m = season_total_water_equivalent_m(
+        predictor, station, sorted(COLLECTION_MONTHS)
+    )
+    return {
+        "station": station,
+        "model": predictor.name,
+        "collection_months": sorted(COLLECTION_MONTHS),
+        "season_water_equivalent_m": round(season_we_m, 4),
+        "months": [
+            {
+                "month": p.month,
+                "expected_m": round(p.expected_m, 4),
+                "low_m": round(p.low_m, 4),
+                "high_m": round(p.high_m, 4),
+            }
+            for p in year
+        ],
+    }
+
+
+def _footprint_for(name: str | None) -> DataCenterFootprint:
+    """Build a DataCenterFootprint from a known DC name (or the default)."""
+    dc = by_name(name) if name else DATA_CENTERS[0]
+    return DataCenterFootprint(
+        name=f"{dc.operator} - {dc.name}, {dc.city}",
+        it_load_kw=dc.it_load_kw,
+        pue=dc.pue,
+        wue_l_per_kwh=dc.wue_l_per_kwh,
+        cooling_fraction=dc.cooling_fraction,
+        grid_co2_kg_per_kwh=dc.grid_co2_kg_per_kwh,
+    )
+
+
+@app.get("/metrics")
+def metrics(datacenter: str | None = None, ai_growth_factor: float = 1.8):
+    """Dashboard headline metrics for a data center.
+
+    - Water usage (daily + yearly, liters + gallons)
+    - Heat dissipated per day (the cooling load)
+    - Projected AI-driven water increase (ai_growth_factor: 1.0 = flat, 1.8 = +80%)
+    - Snow required (COOLING-EQUIVALENCE) to offset today's and projected water
+    """
+    fp = _footprint_for(datacenter)
+    m = compute_dashboard(fp, ai_growth_factor=ai_growth_factor)
+
+    def snow(s):
+        return {
+            "water_liters": round(s.water_liters, 0),
+            "ice_tonnes": round(s.ice_tonnes, 0),
+            "snow_m3_fresh": round(s.snow_m3_fresh, 0),
+            "snow_m3_packed": round(s.snow_m3_packed, 0),
+            "ice_m3_solid": round(s.ice_m3_solid, 0),
+            "snow_m3_water_content_fresh": round(s.snow_m3_water_content_fresh, 0),
+        }
+
+    return {
+        "site": m.site,
+        "heat_dissipated_mwh_per_day": round(m.heat_rejected_mwh_per_day, 1),
+        "heat_dissipated_kwh_per_day": round(m.heat_rejected_kwh_per_day, 0),
+        "cooling_power_kw": round(m.cooling_power_kw, 0),
+        "water_liters_per_day": round(m.water_liters_per_day, 0),
+        "water_gallons_per_day": round(m.water_gallons_per_day, 0),
+        "water_liters_per_year": round(m.water_liters_per_year, 0),
+        "water_gallons_per_year": round(m.water_gallons_per_year, 0),
+        "ai_growth_factor": m.ai_growth_factor,
+        "projected_water_gallons_per_year": round(m.projected_water_gallons_per_year, 0),
+        "projected_water_gallons_per_day": round(m.projected_water_gallons_per_day, 0),
+        "extra_water_gallons_per_year": round(m.extra_water_gallons_per_year, 0),
+        "ice_kg_per_liter_water": round(ICE_KG_PER_LITER_WATER, 3),
+        "snow_today": snow(m.snow_today),
+        "snow_projected": snow(m.snow_projected),
+    }
+
+
 @app.post("/assess")
 def do_assess(body: AssessIn):
     if body.datacenter:
@@ -279,8 +371,28 @@ def do_assess(body: AssessIn):
         )
         dc_coords = {"lat": 42.3539, "lon": -71.0598}
 
+    # Snowfall depth: either the fixed input, or derived from the ML prediction.
+    snowfall_m = body.snowfall_m
+    prediction_info = None
+    if body.use_prediction:
+        predictor = get_predictor()
+        we_m = season_total_water_equivalent_m(
+            predictor, body.predict_station, sorted(COLLECTION_MONTHS)
+        )
+        # CollectionInputs expects raw SNOW depth (it applies fresh-snow density);
+        # convert the water-equivalent depth back to snow depth via the ratio.
+        from engine.predictor import DEFAULT_SNOW_TO_LIQUID_RATIO
+
+        snowfall_m = we_m * DEFAULT_SNOW_TO_LIQUID_RATIO
+        prediction_info = {
+            "station": body.predict_station,
+            "model": predictor.name,
+            "season_water_equivalent_m": round(we_m, 4),
+            "derived_snowfall_m": round(snowfall_m, 4),
+        }
+
     geo = CollectionInputs(
-        snowfall_m=body.snowfall_m,
+        snowfall_m=snowfall_m,
         collection_efficiency=body.collection_efficiency,
         effective_lane_width_m=body.effective_lane_width_m,
     )
@@ -336,6 +448,8 @@ def do_assess(body: AssessIn):
             "total_co2_tonnes_yr": round(total_co2_tonnes, 0),
             "annual_cooling_demand_mwh": round(report.annual_cooling_demand_kwh / 1000, 0),
         },
+        "snowfall_m_used": round(snowfall_m, 4),
+        "prediction": prediction_info,     # non-null when use_prediction=true
         "peak_month_offset_pct": season.peak_month_offset_pct,
         "season": [
             {"month": p.month, "demand_mwh": round(p.demand_kwh / 1000, 1),

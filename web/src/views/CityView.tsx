@@ -20,17 +20,28 @@ export default function CityView({
 }: { dataCenters: DataCenter[]; selectedDC?: DataCenter }) {
   const [sites, setSites] = useState<Site[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
+  const [range, setRange] = useState<"day" | "week" | "month">("week");
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [showFarms, setShowFarms] = useState(true);
   const [showHotspots, setShowHotspots] = useState(true);
+  const [showTerrain, setShowTerrain] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     getSites().then(setSites).catch(() => {});
-    setBusy(true);
-    getForecast(42.3601, -71.0589).then(setForecast).catch(() => {}).finally(() => setBusy(false));
-    getHotspots(CANDIDATES, 42.3539, -71.0598).then(setHotspots).catch(() => {});
+    getHotspots(CANDIDATES, 42.3539, -71.0598)
+      .then(setHotspots)
+      .catch((e) => setErr("Terrain/hotspots: " + String(e)));
   }, []);
+
+  useEffect(() => {
+    setBusy(true);
+    getForecast(42.3601, -71.0589, range)
+      .then(setForecast)
+      .catch((e) => setErr("Forecast: " + String(e)))
+      .finally(() => setBusy(false));
+  }, [range]);
 
   return (
     <div className="view">
@@ -39,18 +50,26 @@ export default function CityView({
         <p className="muted">Boston's snow supply this season, the week ahead, and the places terrain says hold the most.</p>
 
         <div className="card">
-          <div className="card-h">This week {busy && "…"}</div>
+          <div className="card-h">Snow outlook {busy && "…"}</div>
+          <div className="tabs" style={{ marginTop: 0 }}>
+            <button className={range === "day" ? "on" : ""} onClick={() => setRange("day")}>Day</button>
+            <button className={range === "week" ? "on" : ""} onClick={() => setRange("week")}>Week</button>
+            <button className={range === "month" ? "on" : ""} onClick={() => setRange("month")}>Month</button>
+          </div>
           {forecast && (
             <>
-              <div className="big-num">{forecast.upcoming_snow_mm} mm</div>
-              <div className="muted">forecast snowfall (NWS, 7-day)</div>
+              <div className="big-num">{forecast.forecast_snow_mm} mm</div>
+              <div className="muted">forecast snowfall (NWS, {range})</div>
               <ul className="periods">
-                {forecast.periods.slice(0, 4).map((p) => (
+                {forecast.periods.slice(0, range === "day" ? 2 : 4).map((p) => (
                   <li key={p.name}><b>{p.name}</b> · {p.temp_f}°F · {p.short}</li>
                 ))}
               </ul>
-              {forecast.upcoming_snow_mm === 0 && (
-                <p className="muted small">No snow in the 7-day window (off-season). The seasonal supply and terrain hotspots below use NOAA historical + USGS data.</p>
+              {forecast.historical && (
+                <p className="muted small">
+                  Historical (same month, NOAA): <b>{forecast.historical.snow_inches} in</b> ({forecast.historical.snow_mm} mm).
+                  {forecast.forecast_snow_mm === 0 && " No live snow in-window (off-season) — historical shown so the number is always real."}
+                </p>
               )}
             </>
           )}
@@ -70,9 +89,11 @@ export default function CityView({
         </div>
 
         <div className="toggles">
-          <label><input type="checkbox" checked={showFarms} onChange={(e) => setShowFarms(e.target.checked)} /> City snow farms ({sites.length})</label>
-          <label><input type="checkbox" checked={showHotspots} onChange={(e) => setShowHotspots(e.target.checked)} /> Terrain hotspots</label>
+          <label><input type="checkbox" checked={showFarms} onChange={(e) => setShowFarms(e.target.checked)} /> ❄ City snow farms ({sites.length})</label>
+          <label><input type="checkbox" checked={showHotspots} onChange={(e) => setShowHotspots(e.target.checked)} /> ● Terrain-predicted hotspots</label>
+          <label><input type="checkbox" checked={showTerrain} onChange={(e) => setShowTerrain(e.target.checked)} /> ⛰ USGS terrain (hillshade)</label>
         </div>
+        {err && <p className="muted small" style={{ color: "#c0392b" }}>{err}</p>}
         <p className="muted small">Honest note: in flat downtown Boston, insulation matters more than terrain. Terrain prediction earns its place for the regional "where should snow collection (and the next data center) go" question.</p>
       </aside>
 
@@ -80,8 +101,10 @@ export default function CityView({
         <MapView
           dataCenters={dataCenters}
           selectedDC={selectedDC}
-          piles={showFarms ? sites.map((s) => ({ name: s.name, lat: s.lat, lon: s.lon, tonnes: 1 })) : []}
+          farms={showFarms ? sites.map((s) => ({ name: s.name, lat: s.lat, lon: s.lon, tonnes: 1 })) : []}
+          piles={[]}
           hotspots={showHotspots ? hotspots : []}
+          terrain={showTerrain}
         />
       </main>
     </div>

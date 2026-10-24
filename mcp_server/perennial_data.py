@@ -16,7 +16,9 @@ from __future__ import annotations
 from mcp.server.mcpserver import MCPServer
 
 from engine.forecast import fetch_snow_forecast
-from engine.noaa import fetch_seasonal_snowfall
+from engine.noaa import BOSTON_LOGAN_GHCND, fetch_seasonal_snowfall
+from engine.predictor import get_predictor, season_total_water_equivalent_m
+from engine.seasonal import COLLECTION_MONTHS
 from engine.terrain import fetch_terrain
 
 mcp = MCPServer("perennial-data")
@@ -52,6 +54,40 @@ def nws_snow_forecast(lat: float, lon: float) -> dict:
         "periods": [
             {"name": p.name, "temp_f": p.temperature_f, "short": p.short_forecast}
             for p in f.periods
+        ],
+    }
+
+
+@mcp.tool()
+def predict_seasonal_snowfall(station: str = BOSTON_LOGAN_GHCND) -> dict:
+    """ML-predicted monthly snowfall for a station, as an expected +/- band (meters).
+
+    This is the seasonal PREDICTION layer (quantile gradient-boosted model trained
+    on NOAA history) — the planning answer that observed history and the 7-day
+    forecast cannot give. Also returns the season-total water-equivalent depth
+    over the winter collection months.
+
+    Args:
+        station: GHCN station id (default Boston Logan).
+    """
+    predictor = get_predictor()
+    year = predictor.predict_year(station)
+    season_we_m = season_total_water_equivalent_m(
+        predictor, station, sorted(COLLECTION_MONTHS)
+    )
+    return {
+        "station": station,
+        "model": predictor.name,
+        "collection_months": sorted(COLLECTION_MONTHS),
+        "season_water_equivalent_m": round(season_we_m, 4),
+        "months": [
+            {
+                "month": p.month,
+                "expected_m": round(p.expected_m, 4),
+                "low_m": round(p.low_m, 4),
+                "high_m": round(p.high_m, 4),
+            }
+            for p in year
         ],
     }
 

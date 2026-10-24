@@ -6,6 +6,11 @@ Sources recorded in HACKATHON_CONTEXT.md.
 
 # --- Thermodynamics ---
 LATENT_HEAT_FUSION_ICE_KJ_PER_KG: float = 334.0  # kJ/kg (NIST; some texts 335)
+# Latent heat of VAPORISATION of water (~25 C). An evaporative cooling tower
+# rejects heat by boiling off water: each kg evaporated carries away ~2260 kJ.
+# This is what lets us relate "water a tower consumes" to "heat rejected", and
+# thus to the ice needed to reject the same heat (cooling-equivalence).
+LATENT_HEAT_VAPORISATION_WATER_KJ_PER_KG: float = 2260.0  # kJ/kg
 SPECIFIC_HEAT_WATER_KJ_PER_KG_K: float = 4.187   # kJ/(kg*K)
 SPECIFIC_HEAT_ICE_KJ_PER_KG_K: float = 2.04      # kJ/(kg*K)
 

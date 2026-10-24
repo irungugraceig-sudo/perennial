@@ -21,3 +21,8 @@ Thumbs.db
 
 # IMPORTANT: never ignore .kiro — required by Hackachusetts rules
 !.kiro/
+
+# Test / ML artifacts
+.hypothesis/
+.pytest_cache/
+*.joblib
