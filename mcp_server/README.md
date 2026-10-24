@@ -7,6 +7,9 @@ functions the app uses, so "how we built it" and "what it does" share one data l
 ## Tools
 - `noaa_seasonal_snowfall(start, end, station)` — observed snowfall totals (NOAA GHCN-Daily via ACIS).
 - `nws_snow_forecast(lat, lon)` — upcoming snowfall + periods (US National Weather Service).
+- `predict_seasonal_snowfall(station)` — ML-predicted monthly snowfall as an expected ± band
+  (quantile gradient-boosted model trained on NOAA history); the seasonal planning answer that
+  observed history and the 7-day forecast cannot provide.
 - `usgs_terrain(lat, lon)` — elevation, slope, aspect (USGS 3DEP) for snow-persistence scoring.
 
 ## Run standalone (stdio)

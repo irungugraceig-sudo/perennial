@@ -317,3 +317,52 @@ def seed_history(
                 depth = max(0.0, math.exp(rng.gauss(mu, sigma)))
             out.append(MonthlySnow(station, year, month, round(depth, 4)))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Shared accessor — one trained predictor for the API / MCP server to reuse
+# ---------------------------------------------------------------------------
+
+# Default on-disk location for a trained model (optional; gitignored *.joblib).
+DEFAULT_MODEL_PATH = Path(__file__).with_name("snowfall_model.joblib")
+
+_CACHED_PREDICTOR: SnowfallPredictor | None = None
+
+
+def get_predictor(model_path: str | Path | None = None) -> SnowfallPredictor:
+    """Return a ready-to-use snowfall predictor, trained/loaded once and cached.
+
+    Resolution order:
+      1. A saved model at `model_path` (or DEFAULT_MODEL_PATH) if it exists.
+      2. Otherwise train an MLSnowfallPredictor on the seed history (fast, ~2s)
+         and cache it in-process.
+
+    Used by api/main.py and mcp_server so they share a single model instance.
+    """
+    global _CACHED_PREDICTOR
+    if _CACHED_PREDICTOR is not None:
+        return _CACHED_PREDICTOR
+
+    path = Path(model_path) if model_path else DEFAULT_MODEL_PATH
+    if path.exists():
+        _CACHED_PREDICTOR = MLSnowfallPredictor.load(path)
+    else:
+        _CACHED_PREDICTOR = MLSnowfallPredictor.train(seed_history())
+    return _CACHED_PREDICTOR
+
+
+def season_total_water_equivalent_m(
+    predictor: SnowfallPredictor,
+    station: str,
+    collection_months: Sequence[int],
+    which: str = "expected",
+) -> float:
+    """Sum predicted water-equivalent snowfall DEPTH (meters) over given months.
+
+    This is the bridge into the engine's collection math: the result is a
+    liquid-water-equivalent depth that snow.py / seasonal.py can turn into mass.
+    """
+    return sum(
+        p.water_equivalent_m(which)
+        for p in predictor.predict_season(station, collection_months)
+    )
