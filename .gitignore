@@ -26,3 +26,4 @@ Thumbs.db
 .hypothesis/
 .pytest_cache/
 *.joblib
+.vercel

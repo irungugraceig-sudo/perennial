@@ -1,72 +1,85 @@
 import { useEffect, useState } from "react";
-import { getImpact, type ImpactYear } from "../api";
+import { getImpact, getReport, type CarbonReport, type ImpactYear } from "../api";
+import { useScenario } from "../scenario";
+
+function fmt(n: number) { return Math.round(n).toLocaleString(); }
 
 export default function ImpactView() {
-  const [cagr, setCagr] = useState(22);
-  const [offsetB, setOffsetB] = useState(2); // billions of gallons snow could offset
+  const { scenario, selectedDC, result } = useScenario();
+  const [report, setReport] = useState<CarbonReport | null>(null);
   const [years, setYears] = useState<ImpactYear[]>([]);
 
   useEffect(() => {
-    getImpact(cagr, offsetB * 1e9).then(setYears).catch(() => {});
-  }, [cagr, offsetB]);
+    if (!scenario.facility) return;
+    getReport(scenario.facility, scenario.credit_price_usd).then(setReport).catch(() => {});
+    getImpact(22, (result?.fresh_water_saved_gallons ?? 2e6)).then(setYears).catch(() => {});
+  }, [scenario.facility, scenario.credit_price_usd, result]);
 
   const maxWater = Math.max(1, ...years.map((y) => y.water_gallons));
-  const W = 620, H = 300, pad = 40;
+  const W = 640, H = 240, pad = 40;
   const x = (i: number) => pad + (i * (W - 2 * pad)) / Math.max(1, years.length - 1);
   const y = (v: number) => H - pad - (v / maxWater) * (H - 2 * pad);
 
   return (
     <div className="view impact-view">
-      <div className="impact-body">
-        <h2>Why it matters</h2>
-        <p className="lede">
-          AI's thirst is climbing fast. US data centers used about <b>17 billion gallons</b> of
-          water for cooling in 2023 — projected to multiply by 2030. Here's that curve, and what
-          stored snow could shave off it.
-        </p>
-
-        <svg viewBox={`0 0 ${W} ${H}`} className="impact-chart">
-          {years.length > 0 && (
-            <>
-              <polyline
-                points={years.map((yr, i) => `${x(i)},${y(yr.water_gallons)}`).join(" ")}
-                fill="none" stroke="#d7263d" strokeWidth="3"
-              />
-              <polygon
-                points={`${x(0)},${y(0)} ` + years.map((yr, i) => `${x(i)},${y(yr.snow_offset_gallons)}`).join(" ") + ` ${x(years.length - 1)},${y(0)}`}
-                fill="rgba(42,123,255,0.35)"
-              />
-              {years.map((yr, i) => (
-                <text key={yr.year} x={x(i)} y={H - 14} fontSize="12" textAnchor="middle" fill="#64748b">{yr.year}</text>
-              ))}
-            </>
-          )}
-        </svg>
-        <div className="chart-legend">
-          <span><i className="sw demand" /> AI cooling-water demand</span>
-          <span><i className="sw snow" /> coverable by stored snow</span>
-        </div>
-
-        <div className="impact-controls">
-          <label className="slider">
-            <span>AI growth rate (CAGR): <b>{cagr}%</b></span>
-            <input type="range" min={5} max={40} step={1} value={cagr} onChange={(e) => setCagr(parseInt(e.target.value))} />
-          </label>
-          <label className="slider">
-            <span>Snow offset ceiling: <b>{offsetB}B gal</b></span>
-            <input type="range" min={0.5} max={10} step={0.5} value={offsetB} onChange={(e) => setOffsetB(parseFloat(e.target.value))} />
-          </label>
-        </div>
-
-        <div className="impact-cards">
-          <div className="card"><div className="card-h">The business flip</div>
-            <p>Boston spends <b>~$47M/year</b> moving snow it treats as waste — it even weighed buying machines to melt it down the sewer. Perennial helps the city <b>sell</b> its cold instead.</p>
+      <div className="dash">
+        <div className="dash-head">
+          <div>
+            <h2>{selectedDC ? `${selectedDC.operator} — ${selectedDC.name}` : "Customer dashboard"}</h2>
+            <p className="muted">{selectedDC?.city} · your sustainability snapshot</p>
           </div>
-          <div className="card"><div className="card-h">The scale story</div>
-            <p>Montreal, Minneapolis, Buffalo, and Hokkaido face the same snow problem. Cold cities can turn winter into a climate asset — exactly where GPU data centers are expanding.</p>
+          <div className="dash-badge">Perennial</div>
+        </div>
+
+        {/* KPI row */}
+        <div className="dash-kpis">
+          <div className="kpi water">
+            <div className="kpi-num">{result ? fmt(result.fresh_water_saved_gallons) : "—"}</div>
+            <div className="kpi-cap">gallons fresh water saved / yr</div>
+          </div>
+          <div className="kpi energy">
+            <div className="kpi-num">{result ? fmt(result.chiller_energy_avoided_mwh) : "—"}</div>
+            <div className="kpi-cap">MWh chiller energy avoided / yr</div>
+          </div>
+          <div className="kpi carbon">
+            <div className="kpi-num">{result ? fmt(result.co2_avoided_tonnes) : "—"}</div>
+            <div className="kpi-cap">tonnes CO₂ avoided / yr</div>
+          </div>
+          <div className="kpi credit">
+            <div className="kpi-num">{report ? "$" + fmt(report.carbon_credits.credit_value_usd_yr) : "—"}</div>
+            <div className="kpi-cap">carbon-credit value / yr</div>
           </div>
         </div>
-        <p className="muted small">Growth anchored to LBNL/DOE projections (DC electricity ~11.8% of US by 2030) and industry capacity CAGR. Sliders are adjustable; snow offset is a ceiling, not a claim of full coverage.</p>
+
+        {/* Growth outlook */}
+        <div className="dash-panel glass">
+          <h3>AI growth outlook — water demand vs. what snow can offset</h3>
+          <svg viewBox={`0 0 ${W} ${H}`} className="impact-chart">
+            {years.length > 0 && (
+              <>
+                <polyline points={years.map((yr, i) => `${x(i)},${y(yr.water_gallons)}`).join(" ")} fill="none" stroke="#ff6b6b" strokeWidth="3" />
+                <polygon points={`${x(0)},${y(0)} ` + years.map((yr, i) => `${x(i)},${y(yr.snow_offset_gallons)}`).join(" ") + ` ${x(years.length - 1)},${y(0)}`} fill="rgba(42,123,255,0.3)" />
+                {years.map((yr, i) => <text key={yr.year} x={x(i)} y={H - 14} fontSize="12" textAnchor="middle" fill="#8aa0ba">{yr.year}</text>)}
+              </>
+            )}
+          </svg>
+          <div className="chart-legend">
+            <span><i className="sw demand" /> projected cooling-water demand</span>
+            <span><i className="sw snow" /> coverable by this facility's snow cooling</span>
+          </div>
+        </div>
+
+        {/* Narrative cards */}
+        <div className="dash-cards">
+          <div className="dash-panel glass">
+            <h3>The business case</h3>
+            <p>Boston spends ~$47M/year moving snow it treats as waste. Perennial lets the city <b>sell</b> delivered cold, so your facility buys a <b>carbon-negative cooling source</b> that counts toward 2030 water and carbon goals.</p>
+          </div>
+          <div className="dash-panel glass">
+            <h3>What you'd report</h3>
+            <p>{result ? `${fmt(result.fresh_water_saved_gallons)} gal of water and ${fmt(result.co2_avoided_tonnes)} tonnes of CO₂ avoided this year` : "Run the calculator"} — auditable from NOAA snowfall and documented physics. Download the PDF in the Calculator's Footprint tab.</p>
+          </div>
+        </div>
       </div>
     </div>
   );

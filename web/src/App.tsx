@@ -1,57 +1,43 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import Hero from "./Hero";
 import CityView from "./views/CityView";
 import DataCenterView from "./views/DataCenterView";
 import ImpactView from "./views/ImpactView";
 import LogicView from "./views/LogicView";
 import Logo from "./Logo";
-import { getDataCenters, type DataCenter } from "./api";
+import AssistantChat from "./AssistantChat";
+import { ScenarioProvider } from "./scenario";
 
 type View = "hero" | "city" | "datacenter" | "impact" | "logic";
 
 export default function App() {
   const [view, setView] = useState<View>("hero");
-  const [dcs, setDcs] = useState<DataCenter[]>([]);
-  const [selected, setSelected] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getDataCenters()
-      .then((d) => { setDcs(d); setSelected(d[0]?.name ?? ""); })
-      .catch((e) => setError(String(e)));
-  }, []);
-
-  const selectedDC = useMemo(() => dcs.find((d) => d.name === selected), [dcs, selected]);
 
   if (view === "hero") {
     return <Hero onPick={(v) => setView(v)} />;
   }
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <button className="logo" onClick={() => setView("hero")}><Logo size={26} /> Perennial</button>
-        <nav>
-          <button className={view === "city" ? "on" : ""} onClick={() => setView("city")}>City</button>
-          <button className={view === "datacenter" ? "on" : ""} onClick={() => setView("datacenter")}>Data Center</button>
-          <button className={view === "impact" ? "on" : ""} onClick={() => setView("impact")}>Impact</button>
-          <button className={view === "logic" ? "on" : ""} onClick={() => setView("logic")}>Logic</button>
-        </nav>
-      </header>
+    <ScenarioProvider>
+      <div className="app">
+        <header className="topbar">
+          <button className="logo" onClick={() => setView("hero")}><Logo size={26} /> Perennial</button>
+          <nav>
+            <button className={view === "city" ? "on" : ""} onClick={() => setView("city")}>City</button>
+            <button className={view === "datacenter" ? "on" : ""} onClick={() => setView("datacenter")}>Calculator</button>
+            <button className={view === "impact" ? "on" : ""} onClick={() => setView("impact")}>Dashboard</button>
+            <button className={view === "logic" ? "on" : ""} onClick={() => setView("logic")}>Logic</button>
+          </nav>
+        </header>
 
-      {error && <div className="banner-error">{error}. Is the API running on :8000?</div>}
+        {view === "city" && <CityView />}
+        {view === "datacenter" && <DataCenterView />}
+        {view === "impact" && <ImpactView />}
+        {view === "logic" && <LogicView />}
 
-      {view === "city" && <CityView dataCenters={dcs} selectedDC={selectedDC} />}
-      {view === "datacenter" && (
-        <DataCenterView
-          dataCenters={dcs}
-          selected={selected}
-          onSelect={setSelected}
-          selectedDC={selectedDC}
-        />
-      )}
-      {view === "impact" && <ImpactView />}
-      {view === "logic" && <LogicView />}
-    </div>
+        {/* AI assistant available on every view, always sees the shared scenario */}
+        <AssistantChat />
+      </div>
+    </ScenarioProvider>
   );
 }

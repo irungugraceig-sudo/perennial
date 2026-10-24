@@ -198,7 +198,7 @@ export const getMetrics = (datacenter?: string, aiGrowthFactor = 1.8) =>
       (datacenter ? `&datacenter=${encodeURIComponent(datacenter)}` : "")
   );
 export const assess = (inputs: AssessInputs) => post<AssessResult>("/assess", inputs);
-export const getForecast = (lat: number, lon: number, range: "day" | "week" | "month" = "week") =>
+export const getForecast = (lat: number, lon: number, range: "day" | "week" = "day") =>
   get<Forecast>(`/forecast?lat=${lat}&lon=${lon}&range=${range}`);
 export const getHotspots = (
   candidates: Array<{ name: string; lat: number; lon: number; snowfall_m: number }>,
@@ -295,3 +295,20 @@ export const getTenants = (datacenter: string) =>
   get<{ datacenter: string; tenants: TenantRow[] }>(`/tenants?datacenter=${encodeURIComponent(datacenter)}`);
 export const getDailyIce = (datacenter: string, snowfall_m = 1.1) =>
   get<DailyIce>(`/daily-ice?datacenter=${encodeURIComponent(datacenter)}&snowfall_m=${snowfall_m}`);
+
+export interface FromWater {
+  water_gallons_per_year: number;
+  snow_needed_tonnes: number;
+  snow_needed_m3_packed: number;
+  cooling_delivered_mwh: number;
+  chiller_energy_avoided_mwh: number;
+  co2_avoided_tonnes: number;
+}
+export const fromWater = (gallons: number) =>
+  get<FromWater>(`/from-water?gallons_per_year=${gallons}`);
+
+export interface ChatTurn { role: "user" | "assistant"; content: string; }
+export const sendChat = (message: string, context: Record<string, unknown>, history: ChatTurn[]) =>
+  post<{ reply: string; mode: string; set_inputs: Record<string, number | string> }>(
+    "/chat", { message, context, history }
+  );

@@ -1,34 +1,39 @@
-/** Perennial logo: a perilla-leaf pair cradling a snow crystal.
- *  Perilla (a hardy perennial herb) + snow = winter's cold, kept alive into summer.
- */
-export default function Logo({ size = 34 }: { size?: number }) {
+/** Dynamic Perennial mark: a rotating snow crystal fused with a sprouting leaf,
+ *  on a green-to-ice gradient. Animated (slow spin + shimmer) for a living feel. */
+export default function Logo({ size = 34, animated = true }: { size?: number; animated?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-label="Perennial logo">
-      {/* left perilla leaf */}
-      <path
-        d="M24 42 C10 36 6 24 10 12 C20 14 26 22 24 42 Z"
-        fill="#2f8f5b" opacity="0.9"
-      />
-      {/* right perilla leaf */}
-      <path
-        d="M24 42 C38 36 42 24 38 12 C28 14 22 22 24 42 Z"
-        fill="#1f6f45" opacity="0.9"
-      />
-      {/* leaf veins */}
-      <path d="M24 40 C18 32 14 22 13 15" stroke="#e9f7ee" strokeWidth="1" opacity="0.6" />
-      <path d="M24 40 C30 32 34 22 35 15" stroke="#e9f7ee" strokeWidth="1" opacity="0.6" />
-      {/* snow crystal */}
-      <g stroke="#2a7bff" strokeWidth="2.2" strokeLinecap="round">
-        <line x1="24" y1="4" x2="24" y2="22" />
-        <line x1="16" y1="8.6" x2="32" y2="17.4" />
-        <line x1="32" y1="8.6" x2="16" y2="17.4" />
-        {/* small branches */}
-        <line x1="24" y1="8" x2="21" y2="6" />
-        <line x1="24" y1="8" x2="27" y2="6" />
-        <line x1="24" y1="18" x2="21" y2="20" />
-        <line x1="24" y1="18" x2="27" y2="20" />
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-label="Perennial" className={animated ? "logo-anim" : ""}>
+      <defs>
+        <linearGradient id="pg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#35d0a5" />
+          <stop offset="0.6" stopColor="#2a7bff" />
+          <stop offset="1" stopColor="#8fe3ff" />
+        </linearGradient>
+        <radialGradient id="pglow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#8fe3ff" stopOpacity="0.5" />
+          <stop offset="1" stopColor="#2a7bff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <circle cx="32" cy="32" r="30" fill="url(#pglow)" />
+
+      {/* snow crystal (spins) */}
+      <g className="logo-spin" stroke="url(#pg)" strokeWidth="3" strokeLinecap="round" fill="none">
+        {[0, 60, 120].map((a) => (
+          <g key={a} transform={`rotate(${a} 32 32)`}>
+            <line x1="32" y1="8" x2="32" y2="56" />
+            <line x1="32" y1="15" x2="26" y2="10" />
+            <line x1="32" y1="15" x2="38" y2="10" />
+            <line x1="32" y1="49" x2="26" y2="54" />
+            <line x1="32" y1="49" x2="38" y2="54" />
+          </g>
+        ))}
       </g>
-      <circle cx="24" cy="13" r="2.4" fill="#2a7bff" />
+
+      {/* leaf sprout at center (perennial/perilla) */}
+      <path d="M32 40 C24 36 22 28 26 22 C32 24 35 32 32 40 Z" fill="#2f8f5b" />
+      <path d="M32 40 C40 36 42 28 38 22 C32 24 29 32 32 40 Z" fill="#247a49" />
+      <circle cx="32" cy="30" r="3" fill="#eafff4" />
     </svg>
   );
 }

@@ -1,4 +1,4 @@
-import ExchangerDiagram from "../ExchangerDiagram";
+import CoolerSchematic from "../CoolerSchematic";
 
 /** Open the calculator logic: the actual formulas, constants, and sources behind
  *  every number. This is the "show your work" panel judges and customers can read. */
@@ -9,9 +9,9 @@ export default function LogicView() {
         <h2>The calculator logic</h2>
         <p className="lede">Every number traces to a formula and a public source. No hidden magic.</p>
 
-        <h3>How the cooling works</h3>
-        <ExchangerDiagram />
-        <p className="muted small">A shell-and-tube heat exchanger. The data center's ultrapure coolant runs inside sealed tubes; dirty snow meltwater flows through the shell around them. Heat crosses the tube walls, the two never mix, so filthy plowed snow can cool a data center safely.</p>
+        <h3>Proposed cooler — engineering schematic</h3>
+        <CoolerSchematic />
+        <p className="muted small">Shell-and-tube design. Ultrapure coolant runs inside sealed tubes; dirty snow meltwater flows through the shell with baffles for turbulence. Heat crosses the tube walls, the two never mix, so filthy plowed snow can cool a data center safely. Shell length is sized to the cooling load with a fouling allowance.</p>
 
         <h3>Physical constants</h3>
         <ul>

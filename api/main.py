@@ -19,6 +19,7 @@ from engine.interfaces import DataCenterFootprint
 from engine.metrics import ICE_KG_PER_LITER_WATER, compute_dashboard
 from engine.noaa import BOSTON_LOGAN_GHCND, fetch_seasonal_snowfall
 from engine.piles import SnowPile
+from engine.assistant import assistant_reply
 from engine.carbon import carbon_credits
 from engine.daily import daily_ice_use
 from engine.explain import explain_offset
@@ -72,6 +73,18 @@ class AssessIn(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+class ChatIn(BaseModel):
+    message: str
+    context: dict | None = None
+    history: list | None = None
+
+
+@app.post("/chat")
+def chat(body: ChatIn):
+    """Guided assistant. Uses Claude when ANTHROPIC_API_KEY is set, else a scripted guide."""
+    return assistant_reply(body.message, context=body.context, history=body.history)
 
 
 @app.get("/sites")
@@ -383,6 +396,38 @@ def explain(body: ExplainIn):
          "unit": s.unit, "source": s.source}
         for s in steps
     ]
+
+
+@app.get("/from-water")
+def from_water(gallons_per_year: float, chiller_cop: float = 4.0, grid_co2_kg_per_kwh: float = 0.30):
+    """Starter input: enter your annual cooling-WATER use, see what snow cooling would save.
+
+    If snow cooling displaces that evaporative cooling, it avoids that fresh water AND the
+    chiller electricity that cooling would have needed, which is where the CO2 saving comes from.
+    """
+    from engine.constants import COOLING_KWH_PER_TONNE_ICE, LITERS_PER_GALLON
+    from engine.metrics import ICE_KG_PER_LITER_WATER
+
+    water_l = gallons_per_year * LITERS_PER_GALLON
+    # Cooling-equivalence: ice mass that matches the heat that evaporated water removed.
+    ice_kg = water_l * ICE_KG_PER_LITER_WATER
+    ice_tonnes = ice_kg / 1000.0
+    # Cooling energy that much melting ice delivers.
+    cooling_kwh = ice_tonnes * COOLING_KWH_PER_TONNE_ICE
+    # Chiller electricity avoided + CO2.
+    chiller_kwh = cooling_kwh / chiller_cop
+    co2_kg = chiller_kwh * grid_co2_kg_per_kwh
+    # Snow volumes (packed pile) for the ice mass.
+    snow_m3_packed = ice_kg / 600.0
+
+    return {
+        "water_gallons_per_year": round(gallons_per_year, 0),
+        "snow_needed_tonnes": round(ice_tonnes, 0),
+        "snow_needed_m3_packed": round(snow_m3_packed, 0),
+        "cooling_delivered_mwh": round(cooling_kwh / 1000, 0),
+        "chiller_energy_avoided_mwh": round(chiller_kwh / 1000, 0),
+        "co2_avoided_tonnes": round(co2_kg / 1000, 1),
+    }
 
 
 @app.get("/tenants")

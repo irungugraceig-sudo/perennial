@@ -2,142 +2,93 @@ import { useEffect, useState } from "react";
 import MapView from "../MapView";
 import SnowfallChart from "../SnowfallChart";
 import {
-  getForecast, getHotspots, getSites, getSnowfallPrediction, snowfallOnDate,
-  type DataCenter, type Forecast, type Hotspot, type Site,
-  type SnowfallOnDate, type SnowfallPrediction,
+  getForecast, getSites, getSnowfallPrediction, snowfallOnDate,
+  type Forecast, type Site, type SnowfallOnDate, type SnowfallPrediction,
 } from "../api";
+import { useScenario } from "../scenario";
 
-// Candidate regions for terrain-predicted snow hotspots (live USGS terrain).
-const CANDIDATES = [
-  { name: "Seaport (Boston)", lat: 42.345, lon: -71.041, snowfall_m: 1.4 },
-  { name: "Blue Hills", lat: 42.2119, lon: -71.1145, snowfall_m: 1.6 },
-  { name: "Mt. Wachusett", lat: 42.4969, lon: -71.8864, snowfall_m: 2.2 },
-  { name: "Worcester", lat: 42.2626, lon: -71.8023, snowfall_m: 1.8 },
-  { name: "Lowell", lat: 42.6334, lon: -71.3162, snowfall_m: 1.5 },
-  { name: "Holyoke", lat: 42.2043, lon: -72.6162, snowfall_m: 2.0 },
-];
-
-export default function CityView({
-  dataCenters, selectedDC,
-}: { dataCenters: DataCenter[]; selectedDC?: DataCenter }) {
+export default function CityView() {
+  const { scenario, set, dataCenters, selectedDC } = useScenario();
   const [sites, setSites] = useState<Site[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
-  const [range, setRange] = useState<"day" | "week" | "month">("week");
-  const [pickDate, setPickDate] = useState<string>("2015-02-10");
-  const [windowDays, setWindowDays] = useState<number>(7);
+  const [range, setRange] = useState<"day" | "week">("day");
   const [dateSnow, setDateSnow] = useState<SnowfallOnDate | null>(null);
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [prediction, setPrediction] = useState<SnowfallPrediction | null>(null);
   const [showFarms, setShowFarms] = useState(true);
-  const [showHotspots, setShowHotspots] = useState(true);
-  const [showTerrain, setShowTerrain] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     getSites().then(setSites).catch(() => {});
-    getHotspots(CANDIDATES, 42.3539, -71.0598)
-      .then(setHotspots)
-      .catch((e) => setErr("Terrain/hotspots: " + String(e)));
     getSnowfallPrediction().then(setPrediction).catch(() => {});
   }, []);
 
   useEffect(() => {
     setBusy(true);
-    getForecast(42.3601, -71.0589, range)
-      .then(setForecast)
-      .catch((e) => setErr("Forecast: " + String(e)))
-      .finally(() => setBusy(false));
+    getForecast(42.3601, -71.0589, range).then(setForecast).catch(() => {}).finally(() => setBusy(false));
   }, [range]);
 
+  // The date is shared scenario state: picking here also drives the Calculator.
   useEffect(() => {
-    if (!pickDate) return;
-    snowfallOnDate(pickDate, windowDays).then(setDateSnow).catch(() => setDateSnow(null));
-  }, [pickDate, windowDays]);
+    if (!scenario.date) return;
+    snowfallOnDate(scenario.date, 7).then(setDateSnow).catch(() => setDateSnow(null));
+  }, [scenario.date]);
 
   return (
     <div className="view">
       <aside className="side">
         <h2>Where is the snow?</h2>
-        <p className="muted">Boston's snow supply this season, the week ahead, and the places terrain says hold the most.</p>
+        <p className="muted">Boston's snow supply and the lots where the city already piles it. The date you pick here feeds the Calculator.</p>
 
-        <div className="card">
-          <div className="card-h">Snow outlook {busy && "…"}</div>
+        <div className="card glass-card">
+          <div className="card-h">Live forecast {busy && "…"}</div>
           <div className="tabs" style={{ marginTop: 0 }}>
-            <button className={range === "day" ? "on" : ""} onClick={() => setRange("day")}>Day</button>
-            <button className={range === "week" ? "on" : ""} onClick={() => setRange("week")}>Week</button>
-            <button className={range === "month" ? "on" : ""} onClick={() => setRange("month")}>Month</button>
+            <button className={range === "day" ? "on" : ""} onClick={() => setRange("day")}>Today</button>
+            <button className={range === "week" ? "on" : ""} onClick={() => setRange("week")}>7 days</button>
           </div>
           {forecast && (
             <>
               <div className="big-num">{forecast.forecast_snow_mm} mm</div>
-              <div className="muted">forecast snowfall (NWS, {range})</div>
+              <div className="muted">live snowfall · next {range === "day" ? "24 h" : "7 days"} (NWS)</div>
               <ul className="periods">
                 {forecast.periods.slice(0, range === "day" ? 2 : 4).map((p) => (
                   <li key={p.name}><b>{p.name}</b> · {p.temp_f}°F · {p.short}</li>
                 ))}
               </ul>
-              {forecast.historical && (
-                <p className="muted small">
-                  Historical (same month, NOAA): <b>{forecast.historical.snow_inches} in</b> ({forecast.historical.snow_mm} mm).
-                  {forecast.forecast_snow_mm === 0 && " No live snow in-window (off-season) — historical shown so the number is always real."}
-                </p>
+              {forecast.forecast_snow_mm === 0 && (
+                <p className="muted small">NWS forecasts ~7 days and it's not snowing now. Pick a winter date below to see real snow and drive the calculator.</p>
               )}
             </>
           )}
         </div>
 
-        <div className="card">
-          <div className="card-h">Snowfall on a date (real NOAA record)</div>
+        <div className="card glass-card">
+          <div className="card-h">Snow date → Calculator input</div>
           <label className="field">
-            <span>Pick any date</span>
-            <input type="date" value={pickDate} onChange={(e) => setPickDate(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Window: ± {Math.floor(windowDays / 2)} days</span>
-            <input type="range" min={1} max={31} step={2} value={windowDays}
-              onChange={(e) => setWindowDays(parseInt(e.target.value))} style={{ width: "100%", accentColor: "#2a7bff" }} />
+            <span>Pick any date (feeds the savings math)</span>
+            <input type="date" value={scenario.date} onChange={(e) => set({ date: e.target.value })} />
           </label>
           {dateSnow && (
             <>
               <div className="big-num">{dateSnow.snow_inches} in</div>
-              <div className="muted">
-                snowfall over {dateSnow.window_start} to {dateSnow.window_end} · {dateSnow.label}
-              </div>
-              <p className="muted small">{dateSnow.note}</p>
-              <p className="muted small">Source: NOAA GHCN-Daily, Boston Logan. Future dates use the same window from the prior year.</p>
+              <div className="muted">over {dateSnow.window_start} to {dateSnow.window_end} · {dateSnow.label}</div>
+              <p className="muted small">{dateSnow.note} The calculator now uses {scenario.snowfall_m.toFixed(2)} m seasonal snowfall from this.</p>
             </>
           )}
         </div>
 
         {prediction && (
-          <div className="card">
-            <div className="card-h">Season snowfall prediction (AI model)</div>
+          <div className="card glass-card">
+            <div className="card-h">Season prediction (AI model)</div>
             <SnowfallChart months={prediction.months} collectionMonths={prediction.collection_months} />
-            <p className="muted small">Model: {prediction.model}. Season water-equivalent ~{prediction.season_water_equivalent_m.toFixed(2)} m. Highlighted bars = collection months.</p>
+            <p className="muted small">Model: {prediction.model}. Season water-equivalent ~{prediction.season_water_equivalent_m.toFixed(2)} m.</p>
           </div>
         )}
 
-        <div className="card">
-          <div className="card-h">Terrain-predicted hotspots</div>
-          <p className="muted small">Scored live from USGS elevation, slope, and north-facing aspect + snowfall. These are the places that get and keep the most snow.</p>
-          <ol className="ranked">
-            {hotspots.map((h) => (
-              <li key={h.name}>
-                <span className="badge" style={{ background: `hsl(${120 * h.score},75%,45%)` }}>{(h.score * 100).toFixed(0)}</span>
-                <b>{h.name}</b><span className="muted small"> {h.elevation_m} m</span>
-              </li>
-            ))}
-          </ol>
+        <div className="card glass-card">
+          <div className="card-h">City snow farms ({sites.length})</div>
+          <p className="muted small">The lots where Boston hauls plowed snow. Insulated piles survive into summer, that stored cold is what Perennial harvests.</p>
+          <label className="toggle-inline"><input type="checkbox" checked={showFarms} onChange={(e) => setShowFarms(e.target.checked)} /> Show on map</label>
         </div>
-
-        <div className="toggles">
-          <label><input type="checkbox" checked={showFarms} onChange={(e) => setShowFarms(e.target.checked)} /> ❄ City snow farms ({sites.length})</label>
-          <label><input type="checkbox" checked={showHotspots} onChange={(e) => setShowHotspots(e.target.checked)} /> ● Terrain-predicted hotspots</label>
-          <label><input type="checkbox" checked={showTerrain} onChange={(e) => setShowTerrain(e.target.checked)} /> ⛰ USGS terrain (hillshade)</label>
-        </div>
-        {err && <p className="muted small" style={{ color: "#c0392b" }}>{err}</p>}
-        <p className="muted small">Honest note: in flat downtown Boston, insulation matters more than terrain. Terrain prediction earns its place for the regional "where should snow collection (and the next data center) go" question.</p>
       </aside>
 
       <main className="map-wrap">
@@ -146,8 +97,7 @@ export default function CityView({
           selectedDC={selectedDC}
           farms={showFarms ? sites.map((s) => ({ name: s.name, lat: s.lat, lon: s.lon, tonnes: 1 })) : []}
           piles={[]}
-          hotspots={showHotspots ? hotspots : []}
-          terrain={showTerrain}
+          hotspots={[]}
         />
       </main>
     </div>
