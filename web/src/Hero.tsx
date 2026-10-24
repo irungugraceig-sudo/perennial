@@ -13,7 +13,7 @@ export default function Hero({ onPick }: { onPick: (v: View) => void }) {
           Snowy cities throw away free winter cold. <b>Perennial connects the two.</b>
         </p>
         <p className="sub">
-          We turn a city's discarded snow into clean cooling for GPU data centers — and prove
+          We turn a city's discarded snow into clean cooling for GPU data centers, and prove
           the water, energy, and carbon it saves.
         </p>
 
@@ -26,7 +26,7 @@ export default function Hero({ onPick }: { onPick: (v: View) => void }) {
           <button className="path dc" onClick={() => onPick("datacenter")}>
             <span className="path-icon">🖥️</span>
             <span className="path-title">I'm a Data Center</span>
-            <span className="path-desc">How much can I save — now and as I grow?</span>
+            <span className="path-desc">How much can I save, now and as I grow?</span>
           </button>
           <button className="path impact" onClick={() => onPick("impact")}>
             <span className="path-icon">🌍</span>

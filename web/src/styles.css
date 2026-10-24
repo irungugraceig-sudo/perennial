@@ -333,3 +333,9 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 .sf-cap { font-size: 10px; color: #64748b; }
 .sf-arrow { color: #9fb3cc; font-size: 20px; }
 .starter-note { font-size: 11px; color: #64748b; line-height: 1.5; margin: 6px 0 0; }
+
+/* real logo image */
+.logo-img { object-fit: contain; border-radius: 8px; vertical-align: middle; }
+.hero-logo .logo-img { filter: drop-shadow(0 0 28px rgba(80,180,255,0.55)); animation: float 5s ease-in-out infinite; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.topbar .logo .logo-img { background: rgba(255,255,255,0.08); padding: 2px; }
