@@ -16,6 +16,7 @@ from engine.datacenters import DATA_CENTERS, by_name
 from engine.forecast import fetch_snow_forecast
 from engine.hotspots import Candidate, ScoreWeights, score_candidate
 from engine.interfaces import DataCenterFootprint
+from engine.metrics import ICE_KG_PER_LITER_WATER, compute_dashboard
 from engine.noaa import BOSTON_LOGAN_GHCND, fetch_seasonal_snowfall
 from engine.piles import SnowPile
 from engine.predictor import get_predictor, season_total_water_equivalent_m
@@ -200,6 +201,60 @@ def predict_snowfall(station: str = BOSTON_LOGAN_GHCND):
             }
             for p in year
         ],
+    }
+
+
+def _footprint_for(name: str | None) -> DataCenterFootprint:
+    """Build a DataCenterFootprint from a known DC name (or the default)."""
+    dc = by_name(name) if name else DATA_CENTERS[0]
+    return DataCenterFootprint(
+        name=f"{dc.operator} - {dc.name}, {dc.city}",
+        it_load_kw=dc.it_load_kw,
+        pue=dc.pue,
+        wue_l_per_kwh=dc.wue_l_per_kwh,
+        cooling_fraction=dc.cooling_fraction,
+        grid_co2_kg_per_kwh=dc.grid_co2_kg_per_kwh,
+    )
+
+
+@app.get("/metrics")
+def metrics(datacenter: str | None = None, ai_growth_factor: float = 1.8):
+    """Dashboard headline metrics for a data center.
+
+    - Water usage (daily + yearly, liters + gallons)
+    - Heat dissipated per day (the cooling load)
+    - Projected AI-driven water increase (ai_growth_factor: 1.0 = flat, 1.8 = +80%)
+    - Snow required (COOLING-EQUIVALENCE) to offset today's and projected water
+    """
+    fp = _footprint_for(datacenter)
+    m = compute_dashboard(fp, ai_growth_factor=ai_growth_factor)
+
+    def snow(s):
+        return {
+            "water_liters": round(s.water_liters, 0),
+            "ice_tonnes": round(s.ice_tonnes, 0),
+            "snow_m3_fresh": round(s.snow_m3_fresh, 0),
+            "snow_m3_packed": round(s.snow_m3_packed, 0),
+            "ice_m3_solid": round(s.ice_m3_solid, 0),
+            "snow_m3_water_content_fresh": round(s.snow_m3_water_content_fresh, 0),
+        }
+
+    return {
+        "site": m.site,
+        "heat_dissipated_mwh_per_day": round(m.heat_rejected_mwh_per_day, 1),
+        "heat_dissipated_kwh_per_day": round(m.heat_rejected_kwh_per_day, 0),
+        "cooling_power_kw": round(m.cooling_power_kw, 0),
+        "water_liters_per_day": round(m.water_liters_per_day, 0),
+        "water_gallons_per_day": round(m.water_gallons_per_day, 0),
+        "water_liters_per_year": round(m.water_liters_per_year, 0),
+        "water_gallons_per_year": round(m.water_gallons_per_year, 0),
+        "ai_growth_factor": m.ai_growth_factor,
+        "projected_water_gallons_per_year": round(m.projected_water_gallons_per_year, 0),
+        "projected_water_gallons_per_day": round(m.projected_water_gallons_per_day, 0),
+        "extra_water_gallons_per_year": round(m.extra_water_gallons_per_year, 0),
+        "ice_kg_per_liter_water": round(ICE_KG_PER_LITER_WATER, 3),
+        "snow_today": snow(m.snow_today),
+        "snow_projected": snow(m.snow_projected),
     }
 
 
