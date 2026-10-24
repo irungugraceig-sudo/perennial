@@ -11,6 +11,7 @@ from __future__ import annotations
 from .constants import COOLING_KWH_PER_TONNE_ICE
 from .cooling import HeatExchanger
 from .interfaces import DataCenterFootprint
+from .noaa import fetch_seasonal_snowfall
 from .piles import SnowPile
 from .snow import CollectionInputs, collected_mass_empirical, collected_mass_geometric
 from .viability import assess
@@ -32,8 +33,20 @@ def main() -> None:
     # 1 tonne of ice ~ this many kWh of cooling
     print(f"Cooling per tonne of ice: {COOLING_KWH_PER_TONNE_ICE:.1f} kWh")
 
-    # Estimate collected snow two ways (Boston, ~1.5 m seasonal snowfall example).
-    geo_inputs = CollectionInputs(snowfall_m=1.5, collection_efficiency=0.4)
+    # Pull REAL Boston snowfall for the record 2014-2015 winter (the snow-farm year).
+    try:
+        season = fetch_seasonal_snowfall("2014-11-01", "2015-04-30")
+        snowfall_m = season.total_meters
+        print(
+            f"NOAA Boston Logan snowfall {season.start}..{season.end}: "
+            f"{season.total_inches:.1f} in ({snowfall_m:.2f} m)"
+        )
+    except Exception as exc:  # offline fallback so the demo always runs
+        snowfall_m = 2.809  # 2014-15 record = 110.6 in
+        print(f"(offline: using 2.809 m record fallback — {exc})")
+
+    # Estimate collected snow two ways.
+    geo_inputs = CollectionInputs(snowfall_m=snowfall_m, collection_efficiency=0.4)
     mass_geo = collected_mass_geometric(geo_inputs)
     mass_emp = collected_mass_empirical(cubic_yards_per_storm=89_000, storms_per_season=6)
     print(f"Collected mass (geometric): {mass_geo/1000:,.0f} tonnes")
