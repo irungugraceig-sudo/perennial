@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check engine output drift",
+      "trigger": "PostFileSave",
+      "description": "Re-runs the viability model and flags if key outputs drift beyond 2% when engine files change.",
+      "matcher": "engine[\\\\/].*\\.py$",
+      "action": {
+        "type": "command",
+        "command": ".\\.venv\\Scripts\\python.exe -m scripts.check_demo_drift",
+        "timeout": 60
+      }
+    }
+  ]
+}

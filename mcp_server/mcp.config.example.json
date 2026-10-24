@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "perennial-data": {
+      "command": "python",
+      "args": ["-m", "mcp_server.perennial_data"],
+      "cwd": ".",
+      "disabled": false,
+      "autoApprove": ["noaa_seasonal_snowfall", "usgs_terrain"]
+    }
+  }
+}
