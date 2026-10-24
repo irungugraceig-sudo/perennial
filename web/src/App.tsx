@@ -3,9 +3,9 @@ import MapView from "./MapView";
 import SeasonChart from "./SeasonChart";
 import SnowfallChart from "./SnowfallChart";
 import {
-  assess, getDataCenters, getForecast, getHotspots, getSnowfallPrediction,
+  assess, getDataCenters, getForecast, getHotspots, getMetrics, getSnowfallPrediction,
   type AssessInputs, type AssessResult, type DataCenter,
-  type Forecast, type Hotspot, type SnowfallPrediction,
+  type Forecast, type Hotspot, type Metrics, type SnowfallPrediction,
 } from "./api";
 
 const DEFAULTS: AssessInputs = {
@@ -60,7 +60,11 @@ function Toggle(p: { label: string; checked: boolean; onChange: (v: boolean) => 
   );
 }
 
-type Tab = "calc" | "snowfall" | "forecast" | "hotspots";
+type Tab = "calc" | "footprint" | "snowfall" | "forecast" | "hotspots";
+
+function fmt(n: number) {
+  return Math.round(n).toLocaleString();
+}
 
 function monthName(m: number) {
   return [
@@ -83,6 +87,8 @@ export default function App() {
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [prediction, setPrediction] = useState<SnowfallPrediction | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [aiGrowth, setAiGrowth] = useState<number>(1.8); // +80% default (LBNL/DOE-anchored)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,6 +140,16 @@ export default function App() {
     } catch (e) { setError(String(e)); } finally { setBusy(false); }
   }
 
+  // Footprint metrics refresh whenever the DC or the AI-growth slider changes.
+  useEffect(() => {
+    if (tab !== "footprint") return;
+    const t = setTimeout(() => {
+      getMetrics(selected || undefined, aiGrowth)
+        .then(setMetrics).catch((e) => setError(String(e)));
+    }, 150);
+    return () => clearTimeout(t);
+  }, [tab, selected, aiGrowth]);
+
   // Load the AI snowfall prediction once so the calculator toggle and the
   // Snowfall tab both have it ready.
   useEffect(() => {
@@ -157,6 +173,7 @@ export default function App() {
 
         <div className="tabs">
           <button className={tab === "calc" ? "on" : ""} onClick={() => setTab("calc")}>Calculator</button>
+          <button className={tab === "footprint" ? "on" : ""} onClick={() => setTab("footprint")}>Footprint</button>
           <button className={tab === "snowfall" ? "on" : ""} onClick={() => { setTab("snowfall"); loadPrediction(); }}>Snowfall AI</button>
           <button className={tab === "forecast" ? "on" : ""} onClick={() => { setTab("forecast"); loadForecast(); }}>Forecast</button>
           <button className={tab === "hotspots" ? "on" : ""} onClick={() => { setTab("hotspots"); loadHotspots(); }}>Hotspots</button>
@@ -220,6 +237,66 @@ export default function App() {
                 </p>
                 <p className="fine">Snowfall: NOAA GHCN-Daily. Modeled, seasonal estimate — snow shaves the peak, it does not replace year-round cooling.</p>
               </>
+            )}
+          </>
+        )}
+
+        {tab === "footprint" && (
+          <>
+            <h2>Today's water footprint</h2>
+            <p className="fine">
+              What this data center uses to stay cool right now, and the snow it would take
+              to do the same job by harvesting cold instead of evaporating water.
+            </p>
+            {metrics ? (
+              <>
+                <div className="stats">
+                  <Stat label="gal water / day" value={fmt(metrics.water_gallons_per_day)} />
+                  <Stat label="MWh heat dissipated / day" value={metrics.heat_dissipated_mwh_per_day.toLocaleString()} />
+                  <Stat label="gal water / year" value={fmt(metrics.water_gallons_per_year)} />
+                  <Stat label="≈ homes' yearly water" value={fmt(metrics.water_gallons_per_year / 100000)} />
+                </div>
+
+                <h2>If AI demand grows</h2>
+                <Slider
+                  label="AI demand growth"
+                  value={aiGrowth}
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  suffix={`× (+${Math.round((aiGrowth - 1) * 100)}%)`}
+                  onChange={setAiGrowth}
+                />
+                <div className="verdict">
+                  At <b>{aiGrowth.toFixed(1)}×</b> demand, this site's water use climbs to{" "}
+                  <b>{fmt(metrics.projected_water_gallons_per_year)}</b> gal/yr —
+                  an extra <b>{fmt(metrics.extra_water_gallons_per_year)}</b> gal every year.
+                </div>
+                <p className="fine">
+                  Growth range anchored to LBNL/DOE projections that US data-center water use
+                  roughly doubles by ~2028. Drag the slider to explore scenarios.
+                </p>
+
+                <h2>Snow required (cooling-equivalent)</h2>
+                <div className="verdict">
+                  Every litre of evaporated cooling water can be replaced by melting{" "}
+                  <b>{metrics.ice_kg_per_liter_water} kg</b> of ice — it absorbs the same heat.
+                </div>
+                <div className="stats">
+                  <Stat label="m³ snow / yr (today, packed pile)" value={fmt(metrics.snow_today.snow_m3_packed)} />
+                  <Stat label="m³ snow / yr (projected)" value={fmt(metrics.snow_projected.snow_m3_packed)} />
+                  <Stat label="tonnes ice / yr (today)" value={fmt(metrics.snow_today.ice_tonnes)} />
+                  <Stat label="tonnes ice / yr (projected)" value={fmt(metrics.snow_projected.ice_tonnes)} />
+                </div>
+                <p className="fine">
+                  Cooling-equivalence: evaporating 1 L of water rejects ~2,260 kJ; melting 1 kg
+                  of ice absorbs ~334 kJ, so 1 L of cooling water ≈ {metrics.ice_kg_per_liter_water} kg
+                  of ice. Volumes shown for a packed storage pile (~600 kg/m³). The cold is the
+                  product — the meltwater is spent coolant, not consumed.
+                </p>
+              </>
+            ) : (
+              <p className="fine">Loading footprint…</p>
             )}
           </>
         )}

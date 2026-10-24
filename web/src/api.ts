@@ -56,6 +56,33 @@ export interface AssessPredictionInfo {
   derived_snowfall_m: number;
 }
 
+export interface SnowEquivalence {
+  water_liters: number;
+  ice_tonnes: number;
+  snow_m3_fresh: number;
+  snow_m3_packed: number;
+  ice_m3_solid: number;
+  snow_m3_water_content_fresh: number;
+}
+
+export interface Metrics {
+  site: string;
+  heat_dissipated_mwh_per_day: number;
+  heat_dissipated_kwh_per_day: number;
+  cooling_power_kw: number;
+  water_liters_per_day: number;
+  water_gallons_per_day: number;
+  water_liters_per_year: number;
+  water_gallons_per_year: number;
+  ai_growth_factor: number;
+  projected_water_gallons_per_year: number;
+  projected_water_gallons_per_day: number;
+  extra_water_gallons_per_year: number;
+  ice_kg_per_liter_water: number;
+  snow_today: SnowEquivalence;
+  snow_projected: SnowEquivalence;
+}
+
 export interface AssessResult {
   site: string;
   datacenter_coords: { lat: number; lon: number };
@@ -137,6 +164,11 @@ export const getDataCenters = () => get<DataCenter[]>("/datacenters");
 export const getSnowfallPrediction = (station?: string) =>
   get<SnowfallPrediction>(
     station ? `/predict-snowfall?station=${encodeURIComponent(station)}` : "/predict-snowfall"
+  );
+export const getMetrics = (datacenter?: string, aiGrowthFactor = 1.8) =>
+  get<Metrics>(
+    `/metrics?ai_growth_factor=${aiGrowthFactor}` +
+      (datacenter ? `&datacenter=${encodeURIComponent(datacenter)}` : "")
   );
 export const assess = (inputs: AssessInputs) => post<AssessResult>("/assess", inputs);
 export const getForecast = (lat: number, lon: number) =>
