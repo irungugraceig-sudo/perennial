@@ -1,15 +1,18 @@
 """Vercel serverless entry point.
 
-Vercel's Python runtime looks for an ASGI/WSGI `app` in this file. We re-export
-the FastAPI app from api.main. The repo root is on sys.path so `engine` imports work.
+Vercel passes the full path (e.g. /api/health) to this ASGI app. The real
+FastAPI app defines routes without the /api prefix, so we wrap it in an outer
+app that mounts it under /api. One mount, no conflicts.
 """
 
 import sys
 from pathlib import Path
 
-# Ensure the repo root is importable (engine/, api/ live there).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from api.main import app  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
 
-# Vercel's @vercel/python detects `app` (ASGI) automatically.
+from api.main import app as _inner  # noqa: E402
+
+app = FastAPI()
+app.mount("/api", _inner)

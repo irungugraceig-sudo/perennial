@@ -1,0 +1,11 @@
+# Full dev/local stack (tests, ML training, MCP). NOT used by the Vercel serverless function.
+# The deployed API runs on the slim runtime deps in requirements.txt + the climatology
+# fallback, so scikit-learn/numpy are not needed in production.
+-r requirements.txt
+pytest==9.1.1
+hypothesis==6.170.9
+uvicorn==0.54.0
+mcp
+scikit-learn>=1.6
+joblib>=1.3
+numpy>=2.1
