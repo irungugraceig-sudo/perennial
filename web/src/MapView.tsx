@@ -7,7 +7,9 @@ export default function MapView(props: {
   dataCenters: DataCenter[];
   selectedDC?: DataCenter;
   piles: Pile[];
+  farms?: Pile[];
   hotspots: Hotspot[];
+  terrain?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -15,13 +17,44 @@ export default function MapView(props: {
 
   useEffect(() => {
     if (!ref.current || mapRef.current) return;
-    mapRef.current = new maplibregl.Map({
+    const map = new maplibregl.Map({
       container: ref.current,
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
       center: [-71.2, 42.4],
       zoom: 9,
     });
+    mapRef.current = map;
+    // USGS 3DEP hillshade as a raster source (added once; toggled via opacity).
+    map.on("load", () => {
+      map.addSource("usgs-hillshade", {
+        type: "raster",
+        tiles: [
+          "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&renderingRule=%7B%22rasterFunction%22%3A%22Hillshade%20Gray%22%7D&f=image",
+        ],
+        tileSize: 256,
+        attribution: "USGS 3DEP",
+      });
+      map.addLayer({
+        id: "usgs-hillshade",
+        type: "raster",
+        source: "usgs-hillshade",
+        paint: { "raster-opacity": 0 },
+      });
+    });
   }, []);
+
+  // Toggle terrain layer opacity.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (map.getLayer("usgs-hillshade")) {
+        map.setPaintProperty("usgs-hillshade", "raster-opacity", props.terrain ? 0.55 : 0);
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("idle", apply);
+  }, [props.terrain]);
 
   // Recenter on the selected data center.
   useEffect(() => {
@@ -47,6 +80,18 @@ export default function MapView(props: {
         .setPopup(new maplibregl.Popup().setHTML(
           `<b>${dc.operator} — ${dc.name}</b><br/>${dc.city}<br/><small>${dc.note}</small>`
         ))
+        .addTo(map);
+      layer.current.push(m);
+    }
+
+    // City snow FARMS (white snowflake markers — collection points, distinct from piles).
+    for (const f of props.farms ?? []) {
+      const el = document.createElement("div");
+      el.className = "farm-marker";
+      el.textContent = "❄";
+      const m = new maplibregl.Marker({ element: el })
+        .setLngLat([f.lon, f.lat])
+        .setPopup(new maplibregl.Popup().setText(`Snow farm: ${f.name}`))
         .addTo(map);
       layer.current.push(m);
     }
@@ -81,7 +126,7 @@ export default function MapView(props: {
         .addTo(map);
       layer.current.push(m);
     }
-  }, [props.dataCenters, props.piles, props.hotspots, props.selectedDC]);
+  }, [props.dataCenters, props.piles, props.farms, props.hotspots, props.selectedDC]);
 
   return <div ref={ref} className="map" />;
 }

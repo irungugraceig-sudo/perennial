@@ -43,8 +43,11 @@ def _get(url: str, timeout: float) -> dict:
     return resp.json()
 
 
-def fetch_snow_forecast(lat: float, lon: float, timeout: float = 30.0) -> SnowForecast:
-    """Fetch upcoming snowfall + day/night periods for a location."""
+def fetch_snow_forecast(lat: float, lon: float, days: int = 7, timeout: float = 30.0) -> SnowForecast:
+    """Fetch upcoming snowfall + day/night periods for a location.
+
+    `days` trims how many forecast periods (day/night) are returned: ~2 periods per day.
+    """
     points = _get(f"https://api.weather.gov/points/{lat},{lon}", timeout)
     props = points["properties"]
     grid_url = f"https://api.weather.gov/gridpoints/{props['gridId']}/{props['gridX']},{props['gridY']}"
@@ -59,8 +62,9 @@ def fetch_snow_forecast(lat: float, lon: float, timeout: float = 30.0) -> SnowFo
             if val is not None:
                 snow_mm += float(val)
 
-    # Human-readable periods.
+    # Human-readable periods (~2 per day). Trim to the requested window.
     fc = _get(props["forecast"], timeout)
+    n_periods = max(2, min(14, days * 2))
     periods = [
         ForecastDay(
             name=p["name"],
@@ -68,7 +72,7 @@ def fetch_snow_forecast(lat: float, lon: float, timeout: float = 30.0) -> SnowFo
             short_forecast=p["shortForecast"],
             is_daytime=bool(p["isDaytime"]),
         )
-        for p in fc["properties"]["periods"][:8]
+        for p in fc["properties"]["periods"][:n_periods]
     ]
 
     return SnowForecast(
