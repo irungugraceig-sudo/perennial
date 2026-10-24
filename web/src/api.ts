@@ -210,3 +210,88 @@ export const planExpansion = (
 ) => post<ExpansionResult>("/expansion", { datacenter, added_it_kw, snow_cooling_mwh_available });
 export const getImpact = (cagr_pct: number, snow_offset_gallons: number) =>
   post<ImpactYear[]>("/impact", { cagr_pct, snow_offset_gallons });
+
+export interface CarbonReport {
+  generated: string;
+  site: string;
+  consumption: {
+    cooling_power_kw: number;
+    heat_rejected_mwh_per_day: number;
+    water_gallons_per_day: number;
+    water_gallons_per_year: number;
+  };
+  snow_cooling_savings: {
+    fraction_of_peak_offset_pct: number;
+    fresh_water_saved_gallons_yr: number;
+    chiller_energy_avoided_mwh_yr: number;
+    co2_avoided_tonnes_yr: number;
+  };
+  carbon_credits: {
+    credits_yr: number;
+    credit_price_usd: number;
+    credit_value_usd_yr: number;
+    credit_value_usd_per_day: number;
+    co2_avoided_kg_per_day: number;
+  };
+}
+
+export const getReport = (datacenter: string, credit_price_usd = 15) =>
+  get<CarbonReport>(`/report?datacenter=${encodeURIComponent(datacenter)}&credit_price_usd=${credit_price_usd}`);
+
+export interface ExplainStep {
+  label: string;
+  formula: string;
+  result: number;
+  unit: string;
+  source: string;
+}
+
+export interface SnowfallOnDate {
+  date: string;
+  label: string;
+  window_start: string;
+  window_end: string;
+  snow_inches: number;
+  snow_meters: number;
+  days_counted: number;
+  is_winter: boolean;
+  note: string;
+}
+
+export const explainOffset = (body: {
+  datacenter: string;
+  snowfall_m: number;
+  collection_efficiency: number;
+  passive_loss_fraction: number;
+  hx_effectiveness: number;
+  hx_fouling_factor: number;
+  chiller_cop: number;
+}) => post<ExplainStep[]>("/explain", body);
+
+export const snowfallOnDate = (date: string, windowDays = 7) =>
+  get<SnowfallOnDate>(`/snowfall-on-date?date=${date}&window_days=${windowDays}`);
+
+export interface TenantRow {
+  name: string;
+  kind: string;
+  gpu_heavy: boolean;
+  it_load_kw: number;
+  water_gal_yr: number;
+  water_saved_gal_yr: number;
+  co2_saved_tonnes_yr: number;
+  share_pct: number;
+}
+
+export interface DailyIce {
+  datacenter: string;
+  usable_ice_tonnes: number;
+  ice_used_today_tonnes: number;
+  cooling_delivered_mwh_today: number;
+  water_saved_gallons_today: number;
+  days_of_cooling_remaining: number;
+}
+
+export const getTenants = (datacenter: string) =>
+  get<{ datacenter: string; tenants: TenantRow[] }>(`/tenants?datacenter=${encodeURIComponent(datacenter)}`);
+export const getDailyIce = (datacenter: string, snowfall_m = 1.1) =>
+  get<DailyIce>(`/daily-ice?datacenter=${encodeURIComponent(datacenter)}&snowfall_m=${snowfall_m}`);

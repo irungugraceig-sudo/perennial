@@ -3,9 +3,11 @@ import Hero from "./Hero";
 import CityView from "./views/CityView";
 import DataCenterView from "./views/DataCenterView";
 import ImpactView from "./views/ImpactView";
+import LogicView from "./views/LogicView";
+import Logo from "./Logo";
 import { getDataCenters, type DataCenter } from "./api";
 
-type View = "hero" | "city" | "datacenter" | "impact";
+type View = "hero" | "city" | "datacenter" | "impact" | "logic";
 
 export default function App() {
   const [view, setView] = useState<View>("hero");
@@ -28,11 +30,12 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="logo" onClick={() => setView("hero")}>❄ Perennial</button>
+        <button className="logo" onClick={() => setView("hero")}><Logo size={26} /> Perennial</button>
         <nav>
           <button className={view === "city" ? "on" : ""} onClick={() => setView("city")}>City</button>
           <button className={view === "datacenter" ? "on" : ""} onClick={() => setView("datacenter")}>Data Center</button>
           <button className={view === "impact" ? "on" : ""} onClick={() => setView("impact")}>Impact</button>
+          <button className={view === "logic" ? "on" : ""} onClick={() => setView("logic")}>Logic</button>
         </nav>
       </header>
 
@@ -48,6 +51,7 @@ export default function App() {
         />
       )}
       {view === "impact" && <ImpactView />}
+      {view === "logic" && <LogicView />}
     </div>
   );
 }

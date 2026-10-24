@@ -1,18 +1,26 @@
-"""Boston-area data center facilities (the customers — anyone running GPUs).
+"""Boston-area data center facilities and the GPU tenants inside them.
 
-We focus on Boston and switch between real facilities, each kept separate (not
-combined) so a facility sees ITS OWN total consumption and savings for carbon
-reporting. AWS appears as an example hyperscaler footprint from public figures.
+Scoped to the Boston metro for realistic, local data. Each facility lists its
+tenants (the customers running GPUs) so we can show per-tenant consumption and
+savings, which is what each tenant needs for its own carbon reporting.
 
 Sources:
-  * AWS global PUE 1.15 (2024), WUE 0.12-0.15 L/kWh — Amazon Sustainability.
+  * AWS global PUE 1.15 (2024), WUE 0.12-0.15 L/kWh — Amazon Sustainability (tenant example).
   * Evaporative colo WUE ~1.8 L/kWh — DOE/LBNL baseline.
   * New England grid ~0.30 kg CO2/kWh (approx).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class Tenant:
+    name: str
+    kind: str                 # "cloud" | "gpu-cloud" | "university" | "enterprise"
+    it_load_kw: float         # this tenant's share of the building's IT load
+    gpu_heavy: bool
 
 
 @dataclass(frozen=True)
@@ -22,7 +30,7 @@ class DataCenter:
     city: str
     latitude: float
     longitude: float
-    kind: str                      # "hyperscaler" | "colocation" | "hpc"
+    kind: str
     gpu_heavy: bool
     it_load_kw: float
     pue: float
@@ -30,9 +38,10 @@ class DataCenter:
     cooling_fraction: float
     grid_co2_kg_per_kwh: float
     note: str = ""
+    tenants: list[Tenant] = field(default_factory=list)
 
 
-# Boston-area facilities. Coordinates are real/approximate building locations.
+# Boston-area facilities only.
 DATA_CENTERS: list[DataCenter] = [
     DataCenter(
         name="Markley One Summer Street",
@@ -43,6 +52,12 @@ DATA_CENTERS: list[DataCenter] = [
         it_load_kw=2000.0, pue=1.5, wue_l_per_kwh=1.8,
         cooling_fraction=0.33, grid_co2_kg_per_kwh=0.30,
         note="Boston's carrier hotel; colo with AI tenants. Evaporative cooling = big water savings.",
+        tenants=[
+            Tenant("AWS-style cloud tenant", "cloud", 800.0, True),
+            Tenant("GPU-cloud startup", "gpu-cloud", 600.0, True),
+            Tenant("University research cluster", "university", 350.0, True),
+            Tenant("Enterprise colo", "enterprise", 250.0, False),
+        ],
     ),
     DataCenter(
         name="Markley Lowell",
@@ -53,6 +68,11 @@ DATA_CENTERS: list[DataCenter] = [
         it_load_kw=3000.0, pue=1.45, wue_l_per_kwh=1.6,
         cooling_fraction=0.34, grid_co2_kg_per_kwh=0.30,
         note="Largest data center in Massachusetts.",
+        tenants=[
+            Tenant("Hyperscaler overflow", "cloud", 1400.0, True),
+            Tenant("GPU-cloud (AI inference)", "gpu-cloud", 900.0, True),
+            Tenant("Hospital/health data", "enterprise", 700.0, False),
+        ],
     ),
     DataCenter(
         name="TierPoint Marlborough",
@@ -63,26 +83,11 @@ DATA_CENTERS: list[DataCenter] = [
         it_load_kw=1500.0, pue=1.5, wue_l_per_kwh=1.7,
         cooling_fraction=0.33, grid_co2_kg_per_kwh=0.30,
         note="Regional colocation west of Boston.",
-    ),
-    DataCenter(
-        name="AWS-style hyperscaler (example)",
-        operator="Hyperscaler profile",
-        city="Greater Boston",
-        latitude=42.4072, longitude=-71.1190,
-        kind="hyperscaler", gpu_heavy=True,
-        it_load_kw=20000.0, pue=1.15, wue_l_per_kwh=0.15,
-        cooling_fraction=0.11, grid_co2_kg_per_kwh=0.30,
-        note="Published AWS figures: PUE 1.15, WUE 0.15 L/kWh (2024). Already efficient — pitch is summer peak + carbon toward 2030 water goals.",
-    ),
-    DataCenter(
-        name="Mass Green HPC Center",
-        operator="Five-university consortium",
-        city="Holyoke, MA",
-        latitude=42.2043, longitude=-72.6162,
-        kind="hpc", gpu_heavy=True,
-        it_load_kw=10000.0, pue=1.3, wue_l_per_kwh=1.2,
-        cooling_fraction=0.23, grid_co2_kg_per_kwh=0.30,
-        note="University GPU/HPC; western MA gets more snow than Boston.",
+        tenants=[
+            Tenant("GPU-cloud tenant", "gpu-cloud", 500.0, True),
+            Tenant("SaaS enterprise", "enterprise", 600.0, False),
+            Tenant("University overflow", "university", 400.0, True),
+        ],
     ),
 ]
 

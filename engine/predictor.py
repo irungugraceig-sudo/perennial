@@ -383,10 +383,15 @@ def get_predictor(model_path: str | Path | None = None) -> SnowfallPredictor:
         return _CACHED_PREDICTOR
 
     path = Path(model_path) if model_path else DEFAULT_MODEL_PATH
-    if path.exists():
-        _CACHED_PREDICTOR = MLSnowfallPredictor.load(path)
-    else:
-        _CACHED_PREDICTOR = MLSnowfallPredictor.train(seed_history())
+    try:
+        if path.exists():
+            _CACHED_PREDICTOR = MLSnowfallPredictor.load(path)
+        else:
+            _CACHED_PREDICTOR = MLSnowfallPredictor.train(seed_history())
+    except ImportError:
+        # scikit-learn/joblib unavailable (e.g. slim serverless deploy) -> use the
+        # pure-Python climatology baseline. Still a real projection band, no ML needed.
+        _CACHED_PREDICTOR = ClimatologyPredictor.from_history(seed_history())
     return _CACHED_PREDICTOR
 
 

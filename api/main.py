@@ -19,6 +19,9 @@ from engine.interfaces import DataCenterFootprint
 from engine.metrics import ICE_KG_PER_LITER_WATER, compute_dashboard
 from engine.noaa import BOSTON_LOGAN_GHCND, fetch_seasonal_snowfall
 from engine.piles import SnowPile
+from engine.carbon import carbon_credits
+from engine.daily import daily_ice_use
+from engine.explain import explain_offset
 from engine.predictor import get_predictor, season_total_water_equivalent_m
 from engine.projection import plan_expansion, project_impact
 from engine.seasonal import COLLECTION_MONTHS, build_season
@@ -343,6 +346,203 @@ def metrics(datacenter: str | None = None, ai_growth_factor: float = 1.8):
         "ice_kg_per_liter_water": round(ICE_KG_PER_LITER_WATER, 3),
         "snow_today": snow(m.snow_today),
         "snow_projected": snow(m.snow_projected),
+    }
+
+
+class ExplainIn(BaseModel):
+    datacenter: str = "Markley One Summer Street"
+    snowfall_m: float = 1.1
+    collection_efficiency: float = 0.12
+    plowed_length_miles: float = 785
+    effective_lane_width_m: float = 11.0
+    fresh_snow_density: float = 100.0
+    passive_loss_fraction: float = 0.25
+    hx_effectiveness: float = 0.85
+    hx_fouling_factor: float = 0.1
+    chiller_cop: float = 4.0
+
+
+@app.post("/explain")
+def explain(body: ExplainIn):
+    """Show the work: the full step-by-step derivation behind the offset numbers."""
+    fp = _footprint_for(body.datacenter)
+    steps = explain_offset(
+        footprint=fp,
+        snowfall_m=body.snowfall_m,
+        collection_efficiency=body.collection_efficiency,
+        plowed_length_miles=body.plowed_length_miles,
+        effective_lane_width_m=body.effective_lane_width_m,
+        fresh_snow_density=body.fresh_snow_density,
+        passive_loss_fraction=body.passive_loss_fraction,
+        hx_effectiveness=body.hx_effectiveness,
+        hx_fouling_factor=body.hx_fouling_factor,
+        chiller_cop=body.chiller_cop,
+    )
+    return [
+        {"label": s.label, "formula": s.formula, "result": round(s.result, 2),
+         "unit": s.unit, "source": s.source}
+        for s in steps
+    ]
+
+
+@app.get("/tenants")
+def tenants(datacenter: str = "Markley One Summer Street"):
+    """Per-tenant consumption and snow-cooling savings inside a facility.
+
+    Each tenant's share of the building's IT load drives its own footprint and
+    its own savings/carbon numbers, which is what it needs for carbon reporting.
+    """
+    dc = by_name(datacenter)
+    out = []
+    for t in dc.tenants:
+        it_kwh_yr = t.it_load_kw * 24 * 365
+        cooling_kw = t.it_load_kw * dc.pue * dc.cooling_fraction
+        cooling_kwh_yr = cooling_kw * 24 * 365
+        water_gal_yr = it_kwh_yr * dc.wue_l_per_kwh / 3.78541
+        # Assume snow cooling can offset the summer peak fraction (~40% of annual here).
+        peak_offset = 0.40
+        water_saved_gal = water_gal_yr * peak_offset
+        chiller_kwh_saved = cooling_kwh_yr * peak_offset / 4.0
+        co2_saved_t = chiller_kwh_saved * dc.grid_co2_kg_per_kwh / 1000
+        out.append({
+            "name": t.name, "kind": t.kind, "gpu_heavy": t.gpu_heavy,
+            "it_load_kw": t.it_load_kw,
+            "water_gal_yr": round(water_gal_yr, 0),
+            "water_saved_gal_yr": round(water_saved_gal, 0),
+            "co2_saved_tonnes_yr": round(co2_saved_t, 1),
+            "share_pct": round(t.it_load_kw / dc.it_load_kw * 100, 0) if dc.it_load_kw else 0,
+        })
+    return {"datacenter": dc.name, "tenants": out}
+
+
+@app.get("/daily-ice")
+def daily_ice(
+    datacenter: str = "Markley One Summer Street",
+    snowfall_m: float = 1.1,
+    collection_efficiency: float = 0.12,
+    passive_loss_fraction: float = 0.25,
+):
+    """For today: usable ice in the pile, how much we can draw, and water saved."""
+    dc = by_name(datacenter)
+    geo = CollectionInputs(snowfall_m=snowfall_m, collection_efficiency=collection_efficiency)
+    mass_kg = collected_mass_geometric(geo)
+    usable_tonnes = mass_kg * (1 - passive_loss_fraction) / 1000.0
+    cooling_kw = dc.it_load_kw * dc.pue * dc.cooling_fraction
+    d = daily_ice_use(usable_tonnes, cooling_kw, dc.wue_l_per_kwh)
+    return {
+        "datacenter": dc.name,
+        "usable_ice_tonnes": round(d.usable_ice_tonnes, 0),
+        "ice_used_today_tonnes": round(d.ice_used_today_tonnes, 1),
+        "cooling_delivered_mwh_today": round(d.cooling_delivered_kwh / 1000, 1),
+        "water_saved_gallons_today": round(d.water_saved_gallons_today, 0),
+        "days_of_cooling_remaining": round(d.days_of_cooling_remaining, 0),
+    }
+
+
+@app.get("/snowfall-on-date")
+def snowfall_on_date(date: str, window_days: int = 7, station: str = BOSTON_LOGAN_GHCND):
+    """Real snowfall around a chosen date (NOAA GHCN-Daily).
+
+    date = 'YYYY-MM-DD'. Returns snowfall in a +/- window. For future dates with no
+    observation yet, we fall back to the same calendar window in the most recent winter
+    and label it as historical/typical.
+    """
+    import datetime
+
+    d = datetime.date.fromisoformat(date)
+    today = datetime.date.today()
+    labeled = "observed"
+
+    target = d
+    # If the date is in the future (no data), use the same window last year.
+    if d > today:
+        try:
+            target = d.replace(year=d.year - 1)
+        except ValueError:
+            target = d - datetime.timedelta(days=365)
+        labeled = "typical (same window, prior year)"
+
+    start = (target - datetime.timedelta(days=window_days // 2)).isoformat()
+    end = (target + datetime.timedelta(days=window_days // 2)).isoformat()
+    s = fetch_seasonal_snowfall(start=start, end=end, station=station)
+
+    # Context note so a low number is not mistaken for a bug.
+    month = d.month
+    is_winter = month in (12, 1, 2, 3)
+    if not is_winter:
+        note = "Outside Boston's snow season (Dec-Mar) - little or no snow is expected here."
+    elif s.total_inches < 1.0:
+        note = "A light-snow window. Boston winters vary a lot: try a wider window, or a known-snowy date like 2022-01-29 (23.8 in) or 2015-02-10 (25.3 in)."
+    else:
+        note = "Snow season window."
+
+    return {
+        "date": date,
+        "label": labeled,
+        "window_start": start,
+        "window_end": end,
+        "snow_inches": round(s.total_inches, 1),
+        "snow_meters": round(s.total_meters, 4),
+        "days_counted": s.days_counted,
+        "is_winter": is_winter,
+        "note": note,
+    }
+
+
+@app.get("/report")
+def report(
+    datacenter: str | None = None,
+    credit_price_usd: float = 15.0,
+    snowfall_m: float = 1.1,
+    collection_efficiency: float = 0.12,
+):
+    """Daily/annual customer report: consumption, snow-cooling savings, and carbon credits.
+
+    This is the downloadable, shareable report for a data-center customer, with the
+    actual carbon-credit calculation (1 credit = 1 tonne CO2 avoided).
+    """
+    import datetime
+
+    fp = _footprint_for(datacenter)
+
+    # Savings from snow cooling (reuse the viability engine).
+    geo = CollectionInputs(snowfall_m=snowfall_m, collection_efficiency=collection_efficiency)
+    mass_geo = collected_mass_geometric(geo)
+    n = len(BOSTON_SNOW_FARMS)
+    piles = [
+        SnowPile(s.name, s.latitude, s.longitude, initial_mass_kg=mass_geo / n,
+                 passive_loss_fraction=0.25)
+        for s in BOSTON_SNOW_FARMS
+    ]
+    rep = assess(fp, piles, HeatExchanger(0.85, 0.1), chiller_cop=4.0)
+
+    co2_tonnes = rep.offset.co2_avoided_kg / 1000.0
+    credits = carbon_credits(co2_tonnes, credit_price_usd_per_tonne=credit_price_usd)
+
+    m = compute_dashboard(fp, ai_growth_factor=1.0)
+
+    return {
+        "generated": datetime.datetime.now().isoformat(timespec="seconds"),
+        "site": fp.name,
+        "consumption": {
+            "cooling_power_kw": round(m.cooling_power_kw, 0),
+            "heat_rejected_mwh_per_day": round(m.heat_rejected_mwh_per_day, 1),
+            "water_gallons_per_day": round(m.water_gallons_per_day, 0),
+            "water_gallons_per_year": round(m.water_gallons_per_year, 0),
+        },
+        "snow_cooling_savings": {
+            "fraction_of_peak_offset_pct": round(rep.fraction_offset * 100, 1),
+            "fresh_water_saved_gallons_yr": round(rep.offset.fresh_water_saved_gallons, 0),
+            "chiller_energy_avoided_mwh_yr": round(rep.offset.chiller_energy_avoided_kwh / 1000, 0),
+            "co2_avoided_tonnes_yr": round(co2_tonnes, 1),
+        },
+        "carbon_credits": {
+            "credits_yr": round(credits.credits_yr, 1),
+            "credit_price_usd": credits.credit_price_usd,
+            "credit_value_usd_yr": round(credits.credit_value_usd_yr, 0),
+            "credit_value_usd_per_day": round(credits.credit_value_usd_per_day, 2),
+            "co2_avoided_kg_per_day": round(credits.co2_avoided_kg_per_day, 1),
+        },
     }
 
 

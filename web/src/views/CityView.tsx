@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import MapView from "../MapView";
+import SnowfallChart from "../SnowfallChart";
 import {
-  getForecast, getHotspots, getSites,
+  getForecast, getHotspots, getSites, getSnowfallPrediction, snowfallOnDate,
   type DataCenter, type Forecast, type Hotspot, type Site,
+  type SnowfallOnDate, type SnowfallPrediction,
 } from "../api";
 
 // Candidate regions for terrain-predicted snow hotspots (live USGS terrain).
@@ -21,7 +23,11 @@ export default function CityView({
   const [sites, setSites] = useState<Site[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [range, setRange] = useState<"day" | "week" | "month">("week");
+  const [pickDate, setPickDate] = useState<string>("2015-02-10");
+  const [windowDays, setWindowDays] = useState<number>(7);
+  const [dateSnow, setDateSnow] = useState<SnowfallOnDate | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [prediction, setPrediction] = useState<SnowfallPrediction | null>(null);
   const [showFarms, setShowFarms] = useState(true);
   const [showHotspots, setShowHotspots] = useState(true);
   const [showTerrain, setShowTerrain] = useState(false);
@@ -33,6 +39,7 @@ export default function CityView({
     getHotspots(CANDIDATES, 42.3539, -71.0598)
       .then(setHotspots)
       .catch((e) => setErr("Terrain/hotspots: " + String(e)));
+    getSnowfallPrediction().then(setPrediction).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -42,6 +49,11 @@ export default function CityView({
       .catch((e) => setErr("Forecast: " + String(e)))
       .finally(() => setBusy(false));
   }, [range]);
+
+  useEffect(() => {
+    if (!pickDate) return;
+    snowfallOnDate(pickDate, windowDays).then(setDateSnow).catch(() => setDateSnow(null));
+  }, [pickDate, windowDays]);
 
   return (
     <div className="view">
@@ -74,6 +86,37 @@ export default function CityView({
             </>
           )}
         </div>
+
+        <div className="card">
+          <div className="card-h">Snowfall on a date (real NOAA record)</div>
+          <label className="field">
+            <span>Pick any date</span>
+            <input type="date" value={pickDate} onChange={(e) => setPickDate(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Window: ± {Math.floor(windowDays / 2)} days</span>
+            <input type="range" min={1} max={31} step={2} value={windowDays}
+              onChange={(e) => setWindowDays(parseInt(e.target.value))} style={{ width: "100%", accentColor: "#2a7bff" }} />
+          </label>
+          {dateSnow && (
+            <>
+              <div className="big-num">{dateSnow.snow_inches} in</div>
+              <div className="muted">
+                snowfall over {dateSnow.window_start} to {dateSnow.window_end} · {dateSnow.label}
+              </div>
+              <p className="muted small">{dateSnow.note}</p>
+              <p className="muted small">Source: NOAA GHCN-Daily, Boston Logan. Future dates use the same window from the prior year.</p>
+            </>
+          )}
+        </div>
+
+        {prediction && (
+          <div className="card">
+            <div className="card-h">Season snowfall prediction (AI model)</div>
+            <SnowfallChart months={prediction.months} collectionMonths={prediction.collection_months} />
+            <p className="muted small">Model: {prediction.model}. Season water-equivalent ~{prediction.season_water_equivalent_m.toFixed(2)} m. Highlighted bars = collection months.</p>
+          </div>
+        )}
 
         <div className="card">
           <div className="card-h">Terrain-predicted hotspots</div>

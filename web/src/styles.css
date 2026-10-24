@@ -124,3 +124,47 @@ body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-
 
 /* city snow-farm markers (distinct from piles and hotspots) */
 .farm-marker { font-size: 18px; line-height: 1; cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); color: #1b4fb3; }
+
+/* logo + name story */
+.topbar .logo { display: flex; align-items: center; gap: 8px; }
+.hero-logo { display: flex; justify-content: center; filter: drop-shadow(0 0 22px rgba(140,190,255,0.5)); }
+.name-story { max-width: 640px; margin: 20px auto 8px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; padding: 16px 18px; }
+.name-story p { font-size: 13px; color: #cfe0f7; line-height: 1.6; margin: 0; }
+.name-story b { color: #fff; }
+
+/* accent stat (carbon credits) */
+.stat.accent { background: #eef9f0; border-color: #bfe6c8; }
+.stat.accent .stat-value { color: #1d6b32; }
+
+/* download button */
+.dl-btn { width: 100%; margin: 10px 0 4px; padding: 11px; border: none; border-radius: 10px; background: var(--frost); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.dl-btn:hover { background: #1b63d8; }
+
+/* logic panel */
+.logic h3 { color: #1b4fb3; margin-top: 22px; }
+.logic ul { font-size: 14px; color: #33465e; line-height: 1.7; }
+.logic .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; background: #f4f8fd; border: 1px solid #e2ecf7; border-radius: 8px; padding: 12px 14px; line-height: 1.7; color: #2a3f57; }
+
+/* date input */
+.field input[type="date"] { width: 100%; padding: 8px; border: 1px solid #d3deea; border-radius: 10px; font-size: 13px; }
+
+/* show-the-math breakdown */
+.math-toggle { width: 100%; text-align: left; margin: 12px 0 4px; padding: 10px 12px; border: 1px dashed #c7d6e8; background: #f7fafe; border-radius: 10px; cursor: pointer; font-size: 13px; color: #1b4fb3; font-weight: 600; }
+.math-steps { list-style: none; counter-reset: step; padding: 0; margin: 6px 0; }
+.math-steps li { counter-increment: step; position: relative; padding: 10px 12px 10px 34px; border: 1px solid #eef3fa; border-radius: 10px; margin-bottom: 6px; background: #fff; }
+.math-steps li::before { content: counter(step); position: absolute; left: 10px; top: 10px; width: 18px; height: 18px; background: #2a7bff; color: #fff; border-radius: 50%; font-size: 11px; display: grid; place-items: center; font-weight: 700; }
+.math-label { font-size: 12.5px; font-weight: 600; color: #22364d; }
+.math-formula { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: #3a5068; margin: 3px 0; }
+.math-result { font-size: 13px; font-weight: 700; color: #1b4fb3; }
+.math-source { font-size: 10.5px; color: #8aa0ba; margin-top: 2px; font-style: italic; }
+
+/* tenants inside a facility */
+.tenants { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.tenant { border: 1px solid #e6eefb; border-radius: 10px; padding: 10px 12px; background: #fff; }
+.tenant-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.chip { font-size: 10px; background: #eef3fa; color: #51637a; padding: 2px 8px; border-radius: 999px; }
+.tenant-rows { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #64748b; margin-top: 4px; }
+.tenant-rows .save { color: #1d6b32; font-weight: 600; }
+
+/* heat exchanger diagram */
+.hx-diagram { width: 100%; background: #fbfdff; border: 1px solid #e2ecf7; border-radius: 12px; margin: 10px 0; }
