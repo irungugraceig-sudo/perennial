@@ -26,8 +26,13 @@ is used automatically for stations/months with no learned model.
 - Primary station: Boston Logan, GHCN `USW00014739` (code accepts any station).
 - Features: cyclical month encoding (sin/cos), month, station latitude, elevation.
 - SI internally: snowfall handled in meters; convert at the edges for display.
-- Trains on monthly records; swap in the real NOAA GHCN monthly totals (via ACIS/MCP) and retrain
-  with no code changes.
+- Trains on monthly records. Train on REAL observed NOAA data (via ACIS) with:
+  `python -m scripts.train_snowfall_model` — pulls 1991–2024 monthly snowfall for Boston Logan,
+  trains, and saves `engine/snowfall_model.joblib` (gitignored). The API / MCP server load that
+  saved model automatically; if it is absent they fall back to a seed history so the app still runs.
+  Use `--offline` to train on the seed without network.
+- "Expected" uses the MEAN (squared-error), not the median — monthly snowfall is heavily
+  right-skewed, so a median collapses toward zero even in winter. Low/high bands are quantiles.
 
 ## Partner boundary
 The data center's heat usage / current footprint is produced by the **footprint** package

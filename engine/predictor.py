@@ -190,7 +190,7 @@ class MLSnowfallPredictor(SnowfallPredictor):
     model_high: object
     station_meta: dict[str, tuple[float, float]]   # station -> (lat, elev)
     fallback: ClimatologyPredictor | None = None
-    name: str = field(default="ml-hgb-quantile", init=False)
+    name: str = field(default="ml-hgb-mean+quantile-band", init=False)
 
     @classmethod
     def train(
@@ -205,7 +205,7 @@ class MLSnowfallPredictor(SnowfallPredictor):
         X = [_features(r.month, r.latitude, r.elevation_m) for r in records]
         y = [r.snow_m for r in records]
 
-        def _fit(quantile: float):
+        def _fit_quantile(quantile: float):
             m = HistGradientBoostingRegressor(
                 loss="quantile",
                 quantile=quantile,
@@ -216,10 +216,22 @@ class MLSnowfallPredictor(SnowfallPredictor):
             m.fit(X, y)
             return m
 
+        # Central "expected" estimate uses the MEAN (squared-error loss), not the
+        # median. Monthly snowfall is heavily right-skewed with many low months,
+        # so a 0.5-quantile median collapses toward zero even in winter. The mean
+        # is the meaningful planning number ("how much snow on an average year").
+        model_mean = HistGradientBoostingRegressor(
+            loss="squared_error",
+            random_state=random_state,
+            max_iter=300,
+            learning_rate=0.05,
+        )
+        model_mean.fit(X, y)
+
         return cls(
-            model_median=_fit(0.5),
-            model_low=_fit(low_quantile),
-            model_high=_fit(high_quantile),
+            model_median=model_mean,                 # "expected" = mean
+            model_low=_fit_quantile(low_quantile),
+            model_high=_fit_quantile(high_quantile),
             station_meta={r.station: (r.latitude, r.elevation_m) for r in records},
             fallback=ClimatologyPredictor.from_history(records),
         )
@@ -287,6 +299,33 @@ _BOSTON_NORMALS_INCHES = {
     1: 14.2, 2: 12.6, 3: 8.1, 4: 1.2, 5: 0.0, 6: 0.0,
     7: 0.0, 8: 0.0, 9: 0.0, 10: 0.1, 11: 1.3, 12: 9.0,
 }
+
+
+def history_from_acis(
+    station: str = BOSTON_LOGAN_GHCND,
+    start_month: str = "1991-07",
+    end_month: str = "2024-06",
+) -> list[MonthlySnow]:
+    """Fetch REAL observed monthly snowfall from ACIS and return training rows.
+
+    This is the production training data path: live NOAA GHCN-Daily monthly
+    totals via noaa.py, converted into MonthlySnow (meters, with real station
+    latitude/elevation). Requires network access to data.rcc-acis.org.
+    """
+    from .noaa import fetch_monthly_snowfall
+
+    records = fetch_monthly_snowfall(start_month, end_month, station=station)
+    return [
+        MonthlySnow(
+            station=r.station,
+            year=r.year,
+            month=r.month,
+            snow_m=round(r.snow_meters, 4),
+            latitude=r.latitude,
+            elevation_m=r.elevation_m,
+        )
+        for r in records
+    ]
 
 
 def seed_history(

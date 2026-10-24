@@ -33,6 +33,85 @@ class SeasonSnowfall:
     days_counted: int
 
 
+@dataclass(frozen=True)
+class MonthlySnowfall:
+    """One month's observed snowfall total for a station (meters, SI)."""
+
+    station: str
+    year: int
+    month: int          # 1-12
+    snow_inches: float
+    snow_meters: float
+    latitude: float
+    elevation_m: float
+
+
+def fetch_monthly_snowfall(
+    start_month: str,
+    end_month: str,
+    station: str = BOSTON_LOGAN_GHCND,
+    timeout: float = 60.0,
+) -> list[MonthlySnowfall]:
+    """Fetch monthly snowfall totals for a station over a range (NOAA GHCN via ACIS).
+
+    Args:
+        start_month, end_month: "YYYY-MM" (inclusive).
+        station: GHCN station id (default Boston Logan).
+
+    Returns one MonthlySnowfall per month. Station latitude/elevation come from
+    the ACIS metadata so the predictor's geographic features are real, not guessed.
+    "T" (trace) counts as ~0; "M"/"S"/missing months are skipped.
+    """
+    payload = {
+        "sid": station,
+        "sdate": start_month,
+        "edate": end_month,
+        "elems": [{"name": "snow", "interval": "mly", "duration": "mly", "reduce": "sum"}],
+    }
+    resp = requests.post(ACIS_URL, json=payload, timeout=timeout)
+    resp.raise_for_status()
+    data = resp.json()
+
+    meta = data.get("meta", {})
+    ll = meta.get("ll", [None, None])
+    latitude = float(ll[1]) if ll and ll[1] is not None else 42.3606
+    elevation_ft = meta.get("elev")
+    # ACIS elevation is in feet; convert to meters. Fall back to Logan's ~3-6 m.
+    elevation_m = float(elevation_ft) * 0.3048 if elevation_ft is not None else 3.4
+
+    out: list[MonthlySnowfall] = []
+    for ym, value in data.get("data", []):
+        try:
+            year_s, month_s = ym.split("-")
+            year, month = int(year_s), int(month_s)
+        except (ValueError, AttributeError):
+            continue
+        if value in ("M", "S", None):
+            continue          # missing month: skip entirely
+        inches = 0.0 if value == "T" else _safe_float(value)
+        if inches is None:
+            continue
+        out.append(
+            MonthlySnowfall(
+                station=station,
+                year=year,
+                month=month,
+                snow_inches=inches,
+                snow_meters=inches * INCH_TO_METER,
+                latitude=latitude,
+                elevation_m=elevation_m,
+            )
+        )
+    return out
+
+
+def _safe_float(value: str) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def fetch_seasonal_snowfall(
     start: str,
     end: str,
