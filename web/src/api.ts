@@ -34,9 +34,33 @@ export interface MonthPoint {
   offset_pct: number;
 }
 
+export interface SnowfallMonth {
+  month: number;
+  expected_m: number;
+  low_m: number;
+  high_m: number;
+}
+
+export interface SnowfallPrediction {
+  station: string;
+  model: string;
+  collection_months: number[];
+  season_water_equivalent_m: number;
+  months: SnowfallMonth[];
+}
+
+export interface AssessPredictionInfo {
+  station: string;
+  model: string;
+  season_water_equivalent_m: number;
+  derived_snowfall_m: number;
+}
+
 export interface AssessResult {
   site: string;
   datacenter_coords: { lat: number; lon: number };
+  snowfall_m_used: number;
+  prediction: AssessPredictionInfo | null;
   peak_month_offset_pct: number;
   season: MonthPoint[];
   collected_tonnes_geometric: number;
@@ -54,6 +78,7 @@ export interface AssessResult {
 export interface AssessInputs {
   datacenter?: string;
   snowfall_m: number;
+  use_prediction?: boolean;
   collection_efficiency: number;
   storms_per_season: number;
   passive_loss_fraction: number;
@@ -109,6 +134,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export const getSites = () => get<Site[]>("/sites");
 export const getDataCenters = () => get<DataCenter[]>("/datacenters");
+export const getSnowfallPrediction = (station?: string) =>
+  get<SnowfallPrediction>(
+    station ? `/predict-snowfall?station=${encodeURIComponent(station)}` : "/predict-snowfall"
+  );
 export const assess = (inputs: AssessInputs) => post<AssessResult>("/assess", inputs);
 export const getForecast = (lat: number, lon: number) =>
   get<Forecast>(`/forecast?lat=${lat}&lon=${lon}`);

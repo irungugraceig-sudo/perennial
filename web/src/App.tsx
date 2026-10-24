@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import MapView from "./MapView";
 import SeasonChart from "./SeasonChart";
+import SnowfallChart from "./SnowfallChart";
 import {
-  assess, getDataCenters, getForecast, getHotspots,
+  assess, getDataCenters, getForecast, getHotspots, getSnowfallPrediction,
   type AssessInputs, type AssessResult, type DataCenter,
-  type Forecast, type Hotspot,
+  type Forecast, type Hotspot, type SnowfallPrediction,
 } from "./api";
 
 const DEFAULTS: AssessInputs = {
   snowfall_m: 1.1,          // a typical Boston winter (honest default, not the record)
+  use_prediction: false,
   collection_efficiency: 0.12,
   storms_per_season: 3,
   passive_loss_fraction: 0.25,
@@ -48,13 +50,27 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-type Tab = "calc" | "forecast" | "hotspots";
+function Toggle(p: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="toggle">
+      <input type="checkbox" checked={p.checked} onChange={(e) => p.onChange(e.target.checked)} />
+      <span className="track"><span className="knob" /></span>
+      <span className="toggle-label">{p.label}</span>
+    </label>
+  );
+}
+
+type Tab = "calc" | "snowfall" | "forecast" | "hotspots";
 
 function monthName(m: number) {
   return [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
   ][m - 1];
+}
+
+function peakSnowMonth(p: SnowfallPrediction) {
+  return p.months.reduce((a, b) => (b.expected_m > a.expected_m ? b : a), p.months[0]);
 }
 
 export default function App() {
@@ -66,6 +82,7 @@ export default function App() {
   const [result, setResult] = useState<AssessResult | null>(null);
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [prediction, setPrediction] = useState<SnowfallPrediction | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,6 +127,19 @@ export default function App() {
     } catch (e) { setError(String(e)); } finally { setBusy(false); }
   }
 
+  async function loadPrediction() {
+    setBusy(true); setError(null);
+    try {
+      setPrediction(await getSnowfallPrediction());
+    } catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }
+
+  // Load the AI snowfall prediction once so the calculator toggle and the
+  // Snowfall tab both have it ready.
+  useEffect(() => {
+    getSnowfallPrediction().then(setPrediction).catch(() => { /* non-fatal */ });
+  }, []);
+
   return (
     <div className="layout">
       <aside className="panel">
@@ -127,6 +157,7 @@ export default function App() {
 
         <div className="tabs">
           <button className={tab === "calc" ? "on" : ""} onClick={() => setTab("calc")}>Calculator</button>
+          <button className={tab === "snowfall" ? "on" : ""} onClick={() => { setTab("snowfall"); loadPrediction(); }}>Snowfall AI</button>
           <button className={tab === "forecast" ? "on" : ""} onClick={() => { setTab("forecast"); loadForecast(); }}>Forecast</button>
           <button className={tab === "hotspots" ? "on" : ""} onClick={() => { setTab("hotspots"); loadHotspots(); }}>Hotspots</button>
         </div>
@@ -136,7 +167,23 @@ export default function App() {
         {tab === "calc" && (
           <>
             <h2>Scenario</h2>
-            <Slider label="Seasonal snowfall" value={inputs.snowfall_m} min={0.2} max={3.5} step={0.1} suffix=" m" onChange={set("snowfall_m")} />
+            <Toggle
+              label="Use AI-predicted snowfall (expected for Boston)"
+              checked={!!inputs.use_prediction}
+              onChange={(v) => setInputs((prev) => ({ ...prev, use_prediction: v }))}
+            />
+            {inputs.use_prediction ? (
+              <div className="ai-note">
+                🤖 Using the AI model's expected snowfall.
+                {result?.prediction && (
+                  <> It predicts <b>{result.prediction.derived_snowfall_m.toFixed(2)} m</b> of snow
+                  this winter ({(result.prediction.season_water_equivalent_m * 1000).toFixed(0)} mm
+                  water-equivalent). Open the <b>Snowfall AI</b> tab to see the full forecast.</>
+                )}
+              </div>
+            ) : (
+              <Slider label="Seasonal snowfall" value={inputs.snowfall_m} min={0.2} max={3.5} step={0.1} suffix=" m" onChange={set("snowfall_m")} />
+            )}
             <Slider label="Collection efficiency" value={inputs.collection_efficiency} min={0.02} max={1} step={0.01} onChange={set("collection_efficiency")} />
             <Slider label="Major storms / season" value={inputs.storms_per_season} min={1} max={12} step={1} onChange={set("storms_per_season")} />
             <Slider label="Pile melt loss" value={inputs.passive_loss_fraction} min={0} max={0.6} step={0.05} onChange={set("passive_loss_fraction")} />
@@ -173,6 +220,45 @@ export default function App() {
                 </p>
                 <p className="fine">Snowfall: NOAA GHCN-Daily. Modeled, seasonal estimate — snow shaves the peak, it does not replace year-round cooling.</p>
               </>
+            )}
+          </>
+        )}
+
+        {tab === "snowfall" && (
+          <>
+            <h2>AI snowfall prediction {busy && "…"}</h2>
+            <p className="fine">
+              A machine-learning model trained on decades of NOAA snowfall history for Boston.
+              It predicts how much snow to <b>expect each month</b> — the planning question a
+              7-day forecast can't answer. Bars show the expected amount; the whiskers show the
+              model's likely range (it's a projection, not a promise).
+            </p>
+            {prediction ? (
+              <>
+                <SnowfallChart months={prediction.months} collectionMonths={prediction.collection_months} />
+                <div className="verdict">
+                  Across the winter collection months, the model expects about{" "}
+                  <b>{(prediction.season_water_equivalent_m * 1000).toFixed(0)} mm</b> of
+                  water-equivalent snow — the raw material for next summer's cooling.
+                </div>
+                <div className="stats">
+                  <Stat
+                    label="snowiest month (expected)"
+                    value={`${monthName(peakSnowMonth(prediction).month)}`}
+                  />
+                  <Stat
+                    label="expected peak snowfall"
+                    value={`${(peakSnowMonth(prediction).expected_m * 100).toFixed(0)} cm`}
+                  />
+                </div>
+                <p className="fine">
+                  Model: {prediction.model} · station {prediction.station} (Boston Logan).
+                  Source: NOAA GHCN-Daily. Shown as an expected ± range on purpose — honest
+                  planning beats a false single number.
+                </p>
+              </>
+            ) : (
+              <p className="fine">Loading the model's prediction…</p>
             )}
           </>
         )}
